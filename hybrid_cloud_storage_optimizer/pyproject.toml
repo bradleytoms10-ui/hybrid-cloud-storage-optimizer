@@ -1,0 +1,25 @@
+[project]
+name = "hybrid_cloud_storage_optimizer"
+version = "0.1.0"
+description = "hybrid-cloud-storage-optimizer using crewAI"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai[tools]==1.11.0",
+    "litellm>=1.82.5",
+]
+
+[project.scripts]
+hybrid_cloud_storage_optimizer = "hybrid_cloud_storage_optimizer.main:run"
+run_crew = "hybrid_cloud_storage_optimizer.main:run"
+train = "hybrid_cloud_storage_optimizer.main:train"
+replay = "hybrid_cloud_storage_optimizer.main:replay"
+test = "hybrid_cloud_storage_optimizer.main:test"
+run_with_trigger = "hybrid_cloud_storage_optimizer.main:run_with_trigger"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.crewai]
+type = "crew"

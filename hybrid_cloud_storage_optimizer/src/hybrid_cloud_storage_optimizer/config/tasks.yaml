@@ -1,0 +1,26 @@
+analyze_storage:
+  description: >
+    Given this storage configuration: {storage_config}
+    Analyze capacity, utilization, performance metrics, dedup/compression ratios, snapshot usage, and recommend optimizations or migration triggers.
+    Output in structured format: JSON with keys: summary, inefficiencies, recommendations.
+  expected_output: >
+    JSON object with detailed analysis.
+  agent: storage_analyst
+
+estimate_costs:
+  description: >
+    Using the analysis from previous task and this workload profile: {workload_profile}
+    Estimate costs for migrating to AWS S3, Azure Blob, and Google Cloud Storage.
+    Include one-time transfer, monthly storage, egress, and 3-year TCO. Recommend best option.
+    Use latest 2026 pricing.
+  expected_output: >
+    Markdown table + recommendation paragraph.
+  agent: cloud_cost_estimator
+
+generate_plan:
+  description: >
+    Combine storage analysis and cost estimates to create a comprehensive migration plan for {storage_config} to the recommended cloud.
+    Include phases, tools (e.g., Terraform), risks, timeline, and a Mermaid flowchart.
+  expected_output: >
+    Full Markdown report with sections, table, Mermaid diagram, and executive summary.
+  agent: migration_architect
