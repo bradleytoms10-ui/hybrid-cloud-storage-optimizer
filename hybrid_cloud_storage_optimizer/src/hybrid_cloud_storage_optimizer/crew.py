@@ -1,6 +1,6 @@
 from crewai import Agent, Task, Crew, Process
 from crewai.project import CrewBase, agent, task, crew
-
+from .tools.storage_cost_calculator import StorageCostCalculatorTool
 
 @CrewBase
 class HybridCloudStorageOptimizer:
@@ -23,6 +23,7 @@ class HybridCloudStorageOptimizer:
             config=self.agents_config["cloud_cost_estimator"],
             allow_delegation=False,
             verbose=True,
+            tools=[StorageCostCalculatorTool()],
         )
 
     @agent

@@ -1,54 +1,25 @@
-# HybridCloudStorageOptimizer Crew
+# Hybrid Cloud Storage Optimizer AI Agent
 
-Welcome to the HybridCloudStorageOptimizer Crew project, powered by [crewAI](https://crewai.com). This template is designed to help you set up a multi-agent AI system with ease, leveraging the powerful and flexible framework provided by crewAI. Our goal is to enable your agents to collaborate effectively on complex tasks, maximizing their collective intelligence and capabilities.
+**A multi-agent AI system that analyzes on-prem NetApp storage and recommends optimal hybrid-cloud migrations.**
 
-## Installation
+Built as a portfolio project to showcase my 5+ years as a Solutions Architect at NetApp and 8 months as an AI Analyst at CACI.
 
-Ensure you have Python >=3.10 <3.14 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
+### What It Does
+Given a storage config (e.g. "ONTAP cluster with 500TB FAS, 70% utilization, heavy NFS workloads, dedup ratio 2:1") and a workload profile, the crew:
+- Analyzes capacity, performance, dedup, and inefficiencies
+- Calculates accurate 2026 TCO for 6 providers (AWS S3, Azure Blob, Google Cloud, CVO, FSx for NetApp ONTAP, Azure NetApp Files)
+- Intelligently recommends the best option (cost-only vs. NFS/SMB protocol needs)
+- Produces a full executive migration plan with phases, tools, risks, timeline, rollback, and Mermaid diagram
 
-First, if you haven't already, install uv:
+### Tech Stack
+- **CrewAI** (multi-agent orchestration)
+- **Groq** + Llama-3.3-70B (fast, high-quality inference)
+- **Custom Python tool** for accurate TCO calculations
+- Declarative YAML configuration 
+- `uv` + `pyproject.toml` for reproducible environments
 
+### How to Run
 ```bash
-pip install uv
-```
-
-Next, navigate to your project directory and install the dependencies:
-
-(Optional) Lock the dependencies and install them by using the CLI command:
-```bash
-crewai install
-```
-### Customizing
-
-**Add your `OPENAI_API_KEY` into the `.env` file**
-
-- Modify `src/hybrid_cloud_storage_optimizer/config/agents.yaml` to define your agents
-- Modify `src/hybrid_cloud_storage_optimizer/config/tasks.yaml` to define your tasks
-- Modify `src/hybrid_cloud_storage_optimizer/crew.py` to add your own logic, tools and specific args
-- Modify `src/hybrid_cloud_storage_optimizer/main.py` to add custom inputs for your agents and tasks
-
-## Running the Project
-
-To kickstart your crew of AI agents and begin task execution, run this from the root folder of your project:
-
-```bash
-$ crewai run
-```
-
-This command initializes the hybrid-cloud-storage-optimizer Crew, assembling the agents and assigning them tasks as defined in your configuration.
-
-This example, unmodified, will run the create a `report.md` file with the output of a research on LLMs in the root folder.
-
-## Understanding Your Crew
-
-The hybrid-cloud-storage-optimizer Crew is composed of multiple AI agents, each with unique roles, goals, and tools. These agents collaborate on a series of tasks, defined in `config/tasks.yaml`, leveraging their collective skills to achieve complex objectives. The `config/agents.yaml` file outlines the capabilities and configurations of each agent in your crew.
-
-## Support
-
-For support, questions, or feedback regarding the HybridCloudStorageOptimizer Crew or crewAI.
-- Visit our [documentation](https://docs.crewai.com)
-- Reach out to us through our [GitHub repository](https://github.com/joaomdmoura/crewai)
-- [Join our Discord](https://discord.com/invite/X4JWnZnxPb)
-- [Chat with our docs](https://chatg.pt/DWjSBZn)
-
-Let's create wonders together with the power and simplicity of crewAI.
+cd hybrid_cloud_storage_optimizer
+source .venv/bin/activate
+.venv/bin/crewai run

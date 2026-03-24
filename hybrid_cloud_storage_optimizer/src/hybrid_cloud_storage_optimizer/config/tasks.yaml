@@ -9,18 +9,18 @@ analyze_storage:
 
 estimate_costs:
   description: >
-    Using the analysis from previous task and this workload profile: {workload_profile}
-    Estimate costs for migrating to AWS S3, Azure Blob, and Google Cloud Storage.
-    Include one-time transfer, monthly storage, egress, and 3-year TCO. Recommend best option.
-    Use latest 2026 pricing.
+    Using the analysis from the previous task and this workload profile: {workload_profile}
+    Call the storage_cost_calculator tool with capacity_tb set to the USED capacity (after dedup) from the analysis.
+    Consider NFS/SMB protocol needs. Provide a clear comparison table and reasoned recommendation.
   expected_output: >
-    Markdown table + recommendation paragraph.
+    Markdown table with all providers + reasoned recommendation paragraph that explicitly mentions when NetApp-managed services are preferred.
   agent: cloud_cost_estimator
 
 generate_plan:
   description: >
-    Combine storage analysis and cost estimates to create a comprehensive migration plan for {storage_config} to the recommended cloud.
-    Include phases, tools (e.g., Terraform), risks, timeline, and a Mermaid flowchart.
+    Combine the storage analysis and cost estimates to create a professional, executive-ready migration plan.
+    Always include the full cost comparison table, clear phases, tools (Terraform, NetApp Cloud Volumes ONTAP, etc.), risks, timeline, rollback plan, and a clean Mermaid flowchart.
+    Highlight the recommended provider and the reasoning.
   expected_output: >
-    Full Markdown report with sections, table, Mermaid diagram, and executive summary.
+    Professional Markdown report with sections, full cost table, Mermaid diagram, and executive summary.
   agent: migration_architect
