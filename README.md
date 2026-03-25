@@ -17,7 +17,7 @@ Built to showcase my 5+ years as a Solutions Architect at NetApp and 8 months as
 The system is a **sequential multi-agent crew** powered by CrewAI + Groq (Llama-3.3-70B):
 
 1. **Storage Analyst** (NetApp-inspired) → Produces structured JSON analysis
-2. **Cloud Cost Estimator** (CACI-inspired) → Calls a custom Python TCO calculator tool with real pricing
+2. **Cloud Cost Estimator** → Calls a custom Python TCO calculator tool with real pricing
 3. **Migration Architect** → Synthesizes everything into a professional report
 
 Everything runs locally in one command and takes ~20–40 seconds.
