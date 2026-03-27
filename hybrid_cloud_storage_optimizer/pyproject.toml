@@ -27,3 +27,8 @@ packages = ["src/hybrid_cloud_storage_optimizer"]
 
 [tool.crewai]
 type = "crew"
+
+[dependency-groups]
+dev = [
+    "black>=26.3.1",
+]

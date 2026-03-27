@@ -2,6 +2,7 @@ from crewai import Agent, Task, Crew, Process
 from crewai.project import CrewBase, agent, task, crew
 from .tools.storage_cost_calculator import StorageCostCalculatorTool
 
+
 @CrewBase
 class HybridCloudStorageOptimizer:
     """Hybrid Cloud Storage Optimizer - NetApp + Hybrid Cloud migration crew"""
