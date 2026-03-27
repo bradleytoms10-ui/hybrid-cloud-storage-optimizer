@@ -21,7 +21,7 @@ Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate
 * Provides protocol-aware recommendations (object storage vs NetApp-managed file services)
 * Generates a professional phased migration plan with risks, tools, timeline, rollback, and Mermaid diagram
 
-**The goal:** Show how I bridge on-premises storage expertise with modern hybrid-cloud AI automation — exactly the kind of end-to-end thinking employers want for Solutions Engineer/Architect roles.
+**The goal:** Show how I bridge on-premises storage expertise with modern hybrid-cloud AI automation.
 
 ### Steps I Took to Build It (Professional CI/CD-Ready Setup)
 
