@@ -19,16 +19,17 @@ jobs:
       - name: Install uv
         run: pip install uv
 
+      
       - name: Install dependencies
-        run: uv sync
+        run: cd hybrid_cloud_storage_optimizer && uv sync
 
       - name: Run the crew (smoke test)
-        run: uv run crewai run
+        run: cd hybrid_cloud_storage_optimizer && uv run crewai run
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 
       - name: Lint with ruff
-        run: uv run ruff check .
+        run: cd hybrid_cloud_storage_optimizer && uv run ruff check .
 
       - name: Format check with black
-        run: uv run black --check .
+        run: cd hybrid_cloud_storage_optimizer && uv run black --check .
