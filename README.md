@@ -9,7 +9,7 @@ Built to showcase my 5+ years as a Solutions Architect at NetApp and 8 months as
 - Calculates accurate 2026 TCO for 6 providers (AWS S3, Azure Blob, Google Cloud, CVO, FSx for NetApp ONTAP, Azure NetApp Files)
 - Smart recommendation logic — prefers NetApp-managed file services when NFS/SMB is needed
 - Generates a full executive migration plan with phases, tools, risks, timeline, rollback, and Mermaid diagram
-- Includes an interactive **Streamlit web UI** for lie demos
+- Includes an interactive **Streamlit web UI** for live demos
 
 ### How to Run
 cd hybrid_cloud_storage_optimizer
