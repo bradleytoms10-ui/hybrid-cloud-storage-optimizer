@@ -58,3 +58,8 @@ The project uses `pyproject.toml` + `uv` for reproducible installs and is struct
 **CLI**  
 ```bash
 .venv/bin/crewai run
+
+Try the interactive UI locally:
+
+cd hybrid_cloud_storage_optimizer
+.venv/bin/streamlit run src/hybrid_cloud_storage_optimizer/streamlit_app.py
