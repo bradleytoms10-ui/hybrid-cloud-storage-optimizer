@@ -34,7 +34,7 @@ Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate
 3. **CrewAI Framework + Groq LLM**  
    Installed CrewAI with `crewai create crew hybrid-cloud-storage-optimizer`. Chose Groq as the provider and added LiteLLM for reliable model support. Upgraded to Llama-3.3-70B-versatile for better reasoning.
 
-4. **YAML-First Configuration (Solutions Architect Style)**  
+4. **YAML-First Configuration **  
    Replaced the default demo with declarative YAML files:
    - `agents.yaml` — defines three specialized agents with roles, goals, backstories, and explicit LLM assignment
    - `tasks.yaml` — defines sequential tasks with clear expected outputs  
