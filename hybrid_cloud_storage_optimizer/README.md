@@ -46,9 +46,10 @@ Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate
 6. **Interactive UI + Production Foundations**  
    Added a Streamlit web UI for live demos.  
    Implemented GitHub Actions CI/CD pipeline (automated testing, linting, formatting).  
-   Added Docker support and clean `src/` layout.
+   Clean `src/` layout.
+   Soon to add Docker support 
 
-7. **Testing & Iteration**  
+8. **Testing & Iteration**  
    Ran `crewai run` repeatedly, evolving from the default demo to a fully custom, production-like system. All changes are version-controlled with Git.
 
 The project uses `pyproject.toml` + `uv` for reproducible installs and is structured for easy CI/CD, Docker, and deployment to Streamlit Cloud.
