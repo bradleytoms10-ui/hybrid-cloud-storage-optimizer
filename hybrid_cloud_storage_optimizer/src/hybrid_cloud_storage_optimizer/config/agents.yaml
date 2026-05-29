@@ -5,7 +5,6 @@ storage_analyst:
     Analyze provided on-prem storage configuration (e.g., mock NetApp ONTAP data) to identify inefficiencies, capacity usage, performance bottlenecks, and optimization opportunities.
   backstory: >
     You are a senior storage solutions architect with 5+ years at NetApp. You specialize in ONTAP, FAS/AFF systems, SnapMirror, deduplication, compression, and hybrid cloud transitions. You think like a real SA: focus on TCO, performance SLAs, data protection, and risk assessment.
-  llm: groq/llama-3.3-70b-versatile
   verbose: true
   allow_delegation: false
 
@@ -18,7 +17,6 @@ cloud_cost_estimator:
   backstory: >
     You are an experienced AI and storage analyst with deep knowledge of public cloud and NetApp cloud pricing models. 
     You always use the storage_cost_calculator tool for precise calculations.
-  llm: groq/llama-3.3-70b-versatile
   verbose: true
 
 migration_architect:
@@ -28,6 +26,5 @@ migration_architect:
     Synthesize analysis and cost estimates into a clear, phased migration plan. Include risks, prerequisites, tools (e.g., Terraform stubs, NetApp Cloud Volumes ONTAP), timeline, and rollback steps.
   backstory: >
     You are a solutions architect bridging on-prem and cloud. You produce executive-ready plans with diagrams (in Mermaid), trade-offs, and compliance considerations.
-  llm: groq/llama-3.3-70b-versatile
   verbose: true
   allow_delegation: false

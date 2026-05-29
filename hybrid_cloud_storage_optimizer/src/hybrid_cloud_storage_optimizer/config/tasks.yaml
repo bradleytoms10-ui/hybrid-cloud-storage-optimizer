@@ -2,16 +2,22 @@ analyze_storage:
   description: >
     Given this storage configuration: {storage_config}
     Analyze capacity, utilization, performance metrics, dedup/compression ratios, snapshot usage, and recommend optimizations or migration triggers.
-    Output in structured format: JSON with keys: summary, inefficiencies, recommendations.
+    Derive the numeric fields carefully: used_capacity_tb is raw capacity multiplied by utilization;
+    effective_capacity_tb is used_capacity_tb divided by the dedup_ratio. Set needs_file_protocol to
+    true if the workload mentions NFS, SMB, CIFS, ONTAP, or file shares.
   expected_output: >
-    JSON object with detailed analysis.
+    A StorageAnalysis object with: summary, raw_capacity_tb, used_capacity_tb, dedup_ratio,
+    effective_capacity_tb, hot_data_percent, growth_rate_percent, needs_file_protocol,
+    inefficiencies (list), and recommendations (list).
   agent: storage_analyst
 
 estimate_costs:
   description: >
-    Using the analysis from the previous task and this workload profile: {workload_profile}
-    Call the storage_cost_calculator tool with capacity_tb set to the USED capacity (after dedup) from the analysis.
-    Consider NFS/SMB protocol needs. Provide a clear comparison table and reasoned recommendation.
+    Using the StorageAnalysis from the previous task and this workload profile: {workload_profile}
+    Call the storage_cost_calculator tool with capacity_tb set to the analysis effective_capacity_tb,
+    dedup_ratio set to 1.0 (capacity is already post-dedup), and pass hot_percent, growth_rate_percent,
+    and a workload_profile string reflecting needs_file_protocol so NFS/SMB needs are detected.
+    Provide a clear comparison table and reasoned recommendation.
   expected_output: >
     Markdown table with all providers + reasoned recommendation paragraph that explicitly mentions when NetApp-managed services are preferred.
   agent: cloud_cost_estimator

@@ -1,4 +1,3 @@
-User name is John Doe.
-User is an AI Engineer.
-User is interested in AI Agents.
-User is based in San Francisco, California.
+Domain knowledge for this project now lives in netapp_domain_knowledge.txt.
+This placeholder file (a CrewAI scaffold default) is intentionally left empty of
+user data and is not wired into the crew.

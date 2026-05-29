@@ -36,31 +36,44 @@ Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate
 
 4. **YAML-First Configuration **  
    Replaced the default demo with declarative YAML files:
-   - `agents.yaml` — defines three specialized agents with roles, goals, backstories, and explicit LLM assignment
+   - `agents.yaml` — defines three specialized agents with roles, goals, and backstories
    - `tasks.yaml` — defines sequential tasks with clear expected outputs  
-   Updated `crew.py` with the official `@CrewBase` pattern.
+   Updated `crew.py` with the official `@CrewBase` pattern. The LLM is set once from the
+   `MODEL` environment variable (default `groq/llama-3.3-70b-versatile`) as a single source of truth.
 
 5. **Custom Tool + Smart Logic**  
    Built a real `StorageCostCalculatorTool` with 2026 pricing for 6 providers (including CVO, FSx for NetApp ONTAP, and Azure NetApp Files). Added intelligent recommendation logic that considers NFS/SMB protocol needs.
 
-6. **Interactive UI + Production Foundations**  
-   Added a Streamlit web UI for live demos.  
-   Implemented GitHub Actions CI/CD pipeline (automated testing, linting, formatting).  
-   Clean `src/` layout.
-   Soon to add Docker support 
+6. **Typed Data Contract Between Agents**  
+   The storage analyst emits a validated Pydantic `StorageAnalysis` object (`models.py`),
+   so the cost estimator receives type-checked fields (effective capacity, protocol need)
+   instead of parsing free-form text.
 
-8. **Testing & Iteration**  
-   Ran `crewai run` repeatedly, evolving from the default demo to a fully custom, production-like system. All changes are version-controlled with Git.
+7. **Interactive UI + CI**  
+   Added a Streamlit web UI for live demos and a GitHub Actions pipeline (linting with
+   ruff, format checking with black, and a crew smoke test).
 
-The project uses `pyproject.toml` + `uv` for reproducible installs and is structured for easy CI/CD, Docker, and deployment to Streamlit Cloud.
+The project uses a clean `src/` layout with `pyproject.toml` + `uv` for reproducible installs.
+
+#### Roadmap (not yet implemented)
+Unit tests (`pytest`), Dockerfile, structured logging/tracing, and Streamlit Cloud deployment.
 
 
 ### How to Run
-**CLI**  
+
+**Setup**
 ```bash
-.venv/bin/crewai run
-
-Try the interactive UI locally:
-
 cd hybrid_cloud_storage_optimizer
-.venv/bin/streamlit run src/hybrid_cloud_storage_optimizer/streamlit_app.py
+cp .env.example .env        # then add your GROQ_API_KEY
+uv sync
+```
+
+**CLI**
+```bash
+uv run crewai run
+```
+
+**Interactive UI**
+```bash
+uv run streamlit run src/hybrid_cloud_storage_optimizer/streamlit_app.py
+```

@@ -1,0 +1,39 @@
+NetApp & Hybrid Cloud Storage Domain Knowledge
+==============================================
+
+This knowledge base grounds the agents in real on-prem storage and hybrid-cloud
+migration facts so recommendations reflect production solutions-architecture practice.
+
+ONTAP STORAGE EFFICIENCY
+- Deduplication and inline compression typically yield 2:1 to 5:1 effective capacity
+  savings on general-purpose workloads; databases and pre-compressed media see less.
+- Always size cloud targets on EFFECTIVE (post-dedup/compression) capacity, not raw.
+- Snapshot reserve commonly consumes 5-20% of a volume; account for it in capacity math.
+- Thin provisioning means logical allocation can exceed physical used capacity.
+
+PLATFORMS
+- FAS = hybrid (HDD + flash cache), cost-optimized, good for cold/archival tiers.
+- AFF = all-flash, low-latency, used for hot/performance-sensitive workloads.
+- SnapMirror provides asynchronous replication for DR and as a cloud migration vehicle.
+- FabricPool auto-tiers cold blocks from on-prem AFF/FAS to object storage (S3/Blob/GCS).
+
+PROTOCOL COMPATIBILITY (decisive for cloud target choice)
+- NFS / SMB(CIFS) file workloads need a file service that preserves POSIX/Windows
+  semantics. Object storage (S3/Blob/GCS) is NOT a drop-in replacement for these.
+- NetApp-managed file services preserve ONTAP features (snapshots, SnapMirror,
+  dedup, multiprotocol access): Cloud Volumes ONTAP (CVO), Amazon FSx for NetApp
+  ONTAP (FSxN), and Azure NetApp Files (ANF).
+- Object storage suits backup, archive, and cloud-native apps that speak the S3 API.
+
+CLOUD TARGETS (trade-offs)
+- AWS S3 / Azure Blob / Google Cloud Storage: lowest $/GB, object-only, egress fees apply.
+- CVO: full ONTAP in the cloud, BYO licensing, strong feature parity, higher cost.
+- FSxN: AWS-managed ONTAP, native AWS integration, predictable performance tiers.
+- ANF: Azure first-party NetApp service, simple provisioning, premium price tiers.
+
+TCO & MIGRATION CONSIDERATIONS
+- 3-year TCO should include storage, egress/data-transfer, and expected annual growth.
+- Egress and API request charges often dominate for frequently-accessed (hot) data.
+- Migration tooling: SnapMirror for ONTAP-to-ONTAP, AWS DataSync / Azure Migrate for
+  heterogeneous moves, Terraform for repeatable infrastructure provisioning.
+- Always define a rollback path and validate data integrity (checksums) before cutover.

@@ -1,21 +1,31 @@
-from crewai.tools import BaseTool
+"""Template for adding new CrewAI tools to this project.
+
+This is a reference scaffold — it is intentionally NOT registered on any agent.
+The production tool used by the crew is ``StorageCostCalculatorTool`` in
+``storage_cost_calculator.py``. Copy this pattern to add a new capability
+(e.g. a Terraform-plan generator or a live cloud-pricing fetcher), then wire it
+onto an agent in ``crew.py`` via ``tools=[...]``.
+"""
+
 from typing import Type
+
+from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 
-class MyCustomToolInput(BaseModel):
-    """Input schema for MyCustomTool."""
+class ExampleToolInput(BaseModel):
+    """Input schema. Field descriptions are shown to the agent."""
 
-    argument: str = Field(..., description="Description of the argument.")
+    argument: str = Field(..., description="What this argument represents.")
 
 
-class MyCustomTool(BaseTool):
-    name: str = "Name of my tool"
+class ExampleTool(BaseTool):
+    name: str = "example_tool"
     description: str = (
-        "Clear description for what this tool is useful for, your agent will need this information to use it."
+        "Describe precisely what the tool does and when to use it — the agent "
+        "relies on this text to decide whether and how to call the tool."
     )
-    args_schema: Type[BaseModel] = MyCustomToolInput
+    args_schema: Type[BaseModel] = ExampleToolInput
 
     def _run(self, argument: str) -> str:
-        # Implementation goes here
-        return "this is an example of a tool output, ignore it and move along."
+        raise NotImplementedError("Replace with a real implementation before use.")
