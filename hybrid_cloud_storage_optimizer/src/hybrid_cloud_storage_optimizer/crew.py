@@ -11,8 +11,12 @@ DEFAULT_MODEL = "groq/llama-3.3-70b-versatile"
 
 
 def _build_llm() -> LLM:
-    """Construct the shared LLM from the MODEL environment variable."""
-    return LLM(model=os.getenv("MODEL", DEFAULT_MODEL))
+    """Construct the shared LLM from the MODEL environment variable.
+
+    A low temperature keeps tool-call arguments and numeric reasoning stable —
+    important for reliable function calling on Groq/Llama.
+    """
+    return LLM(model=os.getenv("MODEL", DEFAULT_MODEL), temperature=0.1)
 
 
 @CrewBase

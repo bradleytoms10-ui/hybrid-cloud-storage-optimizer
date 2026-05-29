@@ -51,6 +51,12 @@ def friendly_error(exc: Exception) -> str:
         )
     if "rate limit" in text or "429" in text:
         return "Rate limited by the model provider. Wait a moment and try again."
+    if "tool_use_failed" in text or "failed to call a function" in text:
+        return (
+            "The model produced a malformed tool call (a known Groq/Llama quirk). "
+            "Re-run; if it persists, try a different MODEL in .env (e.g. a larger "
+            "Llama or an OpenAI/Anthropic model with stronger function-calling)."
+        )
     if isinstance(exc, ConfigError):
         return str(exc)
     return f"The crew failed to run: {exc}"

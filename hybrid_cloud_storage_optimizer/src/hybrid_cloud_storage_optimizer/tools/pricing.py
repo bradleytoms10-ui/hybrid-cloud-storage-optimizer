@@ -26,7 +26,7 @@ approximate; treat outputs as planning estimates, not quotes.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 GB_PER_TB = 1024
 MONTHS_PER_YEAR = 12
@@ -192,8 +192,14 @@ def build_report(
     egress_turnover_per_month: float = 1.0,
     horizon_years: int = 3,
     workload_profile: str = "",
+    file_protocol_required: Optional[bool] = None,
 ) -> Dict[str, object]:
-    """End-to-end: derive effective capacity, compute TCO, and recommend."""
+    """End-to-end: derive effective capacity, compute TCO, and recommend.
+
+    ``file_protocol_required`` is authoritative when provided (e.g. passed from the
+    upstream StorageAnalysis). When ``None``, it is inferred from ``workload_profile``
+    keywords as a fallback.
+    """
     eff = effective_capacity_tb(raw_or_used_tb, dedup_ratio)
     costs = calculate_tco(
         effective_tb=eff,
@@ -202,7 +208,11 @@ def build_report(
         egress_turnover_per_month=egress_turnover_per_month,
         horizon_years=horizon_years,
     )
-    file_required = needs_file_protocol(workload_profile)
+    file_required = (
+        file_protocol_required
+        if file_protocol_required is not None
+        else needs_file_protocol(workload_profile)
+    )
     rec = recommend(costs, file_required)
 
     return {

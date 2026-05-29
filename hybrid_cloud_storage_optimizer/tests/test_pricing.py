@@ -127,3 +127,28 @@ def test_build_report_surfaces_validation_errors_via_tool(monkeypatch):
     # build_report should raise on bad input (tool layer converts to a message).
     with pytest.raises(ValueError):
         pricing.build_report(raw_or_used_tb=-5)
+
+
+def test_explicit_file_protocol_flag_overrides_text_inference():
+    # Workload text has NO file-protocol keyword, but the explicit flag wins:
+    # the report must require a managed-file recommendation.
+    report = pricing.build_report(
+        raw_or_used_tb=175,
+        dedup_ratio=1.0,
+        workload_profile="mixed hot/cold data, archival 80%",  # no NFS/SMB token
+        file_protocol_required=True,
+    )
+    assert report["needs_file_protocol"] is True
+    assert report["recommended_provider"] == "FSx for NetApp ONTAP"
+
+    # And explicitly False forces object storage even if text mentions NFS.
+    report2 = pricing.build_report(
+        raw_or_used_tb=175,
+        dedup_ratio=1.0,
+        workload_profile="heavy NFS workloads",
+        file_protocol_required=False,
+    )
+    assert report2["needs_file_protocol"] is False
+    assert pricing.PROVIDER_RATES[
+        report2["recommended_provider"].replace(" ", "_")
+    ].category == pricing.OBJECT_STORAGE

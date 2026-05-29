@@ -4,7 +4,7 @@ Keeping the math in ``pricing.py`` makes it unit-testable without CrewAI; this
 module only handles the agent-facing schema, input validation, and error framing.
 """
 
-from typing import Any, Dict, Type
+from typing import Any, Dict, Optional, Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -34,16 +34,16 @@ class StorageCostCalculatorInput(BaseModel):
     growth_rate_percent: float = Field(
         15.0, ge=0, description="Expected annual capacity growth rate, percent."
     )
-    egress_turnover_per_month: float = Field(
-        1.0,
-        ge=0,
-        description="Times the hot working set is read out of the cloud per month.",
+    needs_file_protocol: Optional[bool] = Field(
+        None,
+        description="Whether the workload requires NFS/SMB/CIFS file-protocol "
+        "access. Pass the value from the upstream StorageAnalysis. This is "
+        "authoritative; when omitted, it is inferred from workload_profile text.",
     )
-    horizon_years: int = Field(3, ge=1, le=10, description="TCO horizon in years.")
     workload_profile: str = Field(
         "",
-        description="Free-text workload description; NFS/SMB/CIFS/ONTAP keywords "
-        "trigger a NetApp-managed-file recommendation.",
+        description="The original workload description text. Used only as a "
+        "fallback to detect file-protocol need when needs_file_protocol is omitted.",
     )
 
 
@@ -64,8 +64,7 @@ class StorageCostCalculatorTool(BaseTool):
         dedup_ratio: float = 1.0,
         hot_percent: float = 20.0,
         growth_rate_percent: float = 15.0,
-        egress_turnover_per_month: float = 1.0,
-        horizon_years: int = 3,
+        needs_file_protocol: Optional[bool] = None,
         workload_profile: str = "",
     ) -> Dict[str, Any]:
         try:
@@ -74,9 +73,8 @@ class StorageCostCalculatorTool(BaseTool):
                 dedup_ratio=dedup_ratio,
                 hot_percent=hot_percent,
                 annual_growth_percent=growth_rate_percent,
-                egress_turnover_per_month=egress_turnover_per_month,
-                horizon_years=horizon_years,
                 workload_profile=workload_profile,
+                file_protocol_required=needs_file_protocol,
             )
         except ValueError as exc:
             return {"error": f"Invalid input to storage_cost_calculator: {exc}"}
