@@ -13,10 +13,6 @@ dependencies = [
 [project.scripts]
 hybrid_cloud_storage_optimizer = "hybrid_cloud_storage_optimizer.main:run"
 run_crew = "hybrid_cloud_storage_optimizer.main:run"
-train = "hybrid_cloud_storage_optimizer.main:train"
-replay = "hybrid_cloud_storage_optimizer.main:replay"
-test = "hybrid_cloud_storage_optimizer.main:test"
-run_with_trigger = "hybrid_cloud_storage_optimizer.main:run_with_trigger"
 
 [build-system]
 requires = ["hatchling"]
@@ -31,4 +27,16 @@ type = "crew"
 [dependency-groups]
 dev = [
     "black>=26.3.1",
+    "ruff>=0.10.0",
+    "pytest>=8.0.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+extend-select = ["I"]  # import sorting

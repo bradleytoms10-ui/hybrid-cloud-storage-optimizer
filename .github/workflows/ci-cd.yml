@@ -1,12 +1,19 @@
-name: CI/CD for Hybrid Cloud Storage Optimizer
+name: CI for Hybrid Cloud Storage Optimizer
 
 on:
   push:
     branches: [ main ]
   pull_request:
+  workflow_dispatch:        # allow manually triggering the live smoke test
+
+defaults:
+  run:
+    working-directory: hybrid_cloud_storage_optimizer
 
 jobs:
-  test:
+  # Fast, free, deterministic. Runs on every push/PR. No API keys required.
+  quality:
+    name: Lint, format & unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,20 +26,40 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Install dependencies
-        run: cd hybrid_cloud_storage_optimizer && uv sync
-
-      
-      - name: Install linting tools
-        run: cd hybrid_cloud_storage_optimizer && uv add --dev ruff black
-
-      - name: Run the crew (smoke test)
-        run: cd hybrid_cloud_storage_optimizer && uv run crewai run
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: Install dependencies (incl. dev group)
+        run: uv sync
 
       - name: Lint with ruff
-        run: cd hybrid_cloud_storage_optimizer && uv run ruff check .
+        run: uv run ruff check .
 
       - name: Format check with black
-        run: cd hybrid_cloud_storage_optimizer && uv run black --check .
+        run: uv run black --check .
+
+      - name: Unit tests with pytest
+        run: uv run pytest -q
+
+  # Live end-to-end run against the model provider. Costs tokens and needs a
+  # secret, so it only runs on manual dispatch — never blocks normal commits.
+  smoke-test:
+    name: Live crew smoke test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run the crew
+        run: uv run crewai run
+        env:
+          MODEL: ${{ vars.MODEL || 'groq/llama-3.3-70b-versatile' }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

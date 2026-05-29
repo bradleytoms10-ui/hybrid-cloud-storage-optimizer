@@ -42,21 +42,31 @@ Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate
    `MODEL` environment variable (default `groq/llama-3.3-70b-versatile`) as a single source of truth.
 
 5. **Custom Tool + Smart Logic**  
-   Built a real `StorageCostCalculatorTool` with 2026 pricing for 6 providers (including CVO, FSx for NetApp ONTAP, and Azure NetApp Files). Added intelligent recommendation logic that considers NFS/SMB protocol needs.
+   Built a real `StorageCostCalculatorTool` over a framework-free TCO engine
+   (`tools/pricing.py`) with 2026 pricing for 6 providers (including CVO, FSx for
+   NetApp ONTAP, and Azure NetApp Files). TCO is summed month-by-month with
+   compounded growth (not a flat multiplier), inputs are validated, and pricing
+   assumptions/exclusions are documented. Recommendation logic is protocol-aware
+   (prefers NetApp-managed file services when NFS/SMB is required).
 
 6. **Typed Data Contract Between Agents**  
    The storage analyst emits a validated Pydantic `StorageAnalysis` object (`models.py`),
    so the cost estimator receives type-checked fields (effective capacity, protocol need)
    instead of parsing free-form text.
 
-7. **Interactive UI + CI**  
-   Added a Streamlit web UI for live demos and a GitHub Actions pipeline (linting with
-   ruff, format checking with black, and a crew smoke test).
+7. **Tests, Error Handling & CI**  
+   Deterministic `pytest` suite for the pricing engine (no API calls), friendly
+   error messages for bad/missing API keys (instead of raw tracebacks), and a
+   GitHub Actions pipeline that runs ruff + black + pytest on every push. The live
+   crew smoke test is a separate manual job, so a missing secret never breaks CI.
+
+8. **Interactive UI**  
+   A Streamlit web UI for live demos.
 
 The project uses a clean `src/` layout with `pyproject.toml` + `uv` for reproducible installs.
 
 #### Roadmap (not yet implemented)
-Unit tests (`pytest`), Dockerfile, structured logging/tracing, and Streamlit Cloud deployment.
+Dockerfile, structured logging/tracing/observability, and Streamlit Cloud deployment.
 
 
 ### How to Run
@@ -76,4 +86,11 @@ uv run crewai run
 **Interactive UI**
 ```bash
 uv run streamlit run src/hybrid_cloud_storage_optimizer/streamlit_app.py
+```
+
+**Tests** (deterministic, no API key needed)
+```bash
+uv run pytest -q
+uv run ruff check .
+uv run black --check .
 ```
