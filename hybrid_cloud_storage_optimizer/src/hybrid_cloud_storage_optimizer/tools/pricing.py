@@ -28,6 +28,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+try:  # package import (production)
+    from . import scoring
+    from .scoring import CustomerContext
+except ImportError:  # standalone import (isolated tests)
+    import scoring
+    from scoring import CustomerContext
+
 GB_PER_TB = 1024
 MONTHS_PER_YEAR = 12
 
@@ -227,13 +234,17 @@ def build_report(
     workload_profile: str = "",
     file_protocol_required: Optional[bool] = None,
     enable_tiering: bool = True,
+    context: Optional[CustomerContext] = None,
 ) -> Dict[str, object]:
-    """End-to-end: derive effective capacity, compute TCO, and recommend.
+    """End-to-end: derive effective capacity, compute TCO, score, and recommend.
 
     ``file_protocol_required`` is authoritative when provided (e.g. passed from the
     upstream StorageAnalysis). When ``None``, it is inferred from ``workload_profile``
     keywords as a fallback. ``enable_tiering`` applies FabricPool cold-tiering to
-    NetApp-managed targets (default on).
+    NetApp-managed targets (default on). ``context`` is the Solutions-Engineer
+    discovery context; when provided it drives a multi-factor ranking so the
+    recommendation reflects cloud affinity, performance, compliance, licensing, and
+    strategy — not just cost. Cost figures remain authoritative.
     """
     eff = effective_capacity_tb(raw_or_used_tb, dedup_ratio)
     costs = calculate_tco(
@@ -249,7 +260,15 @@ def build_report(
         if file_protocol_required is not None
         else needs_file_protocol(workload_profile)
     )
-    rec = recommend(costs, file_required)
+    ranked = scoring.score_options(
+        costs, needs_file_protocol=file_required, context=context
+    )
+    top = ranked[0]
+    rec = {
+        "recommended_provider": top["provider"],
+        "recommended_provider_key": top["provider_key"],
+        "reason": _explain(top, file_required),
+    }
 
     return {
         "effective_capacity_after_dedup_tb": round(eff, 2),
@@ -266,6 +285,7 @@ def build_report(
             "excluded_from_model": EXCLUDED_FROM_MODEL,
         },
         "costs": costs,
+        "ranked_options": ranked,
         "recommended_provider": rec["recommended_provider"],
         "three_year_tco_recommended_usd": costs[rec["recommended_provider_key"]][
             "horizon_tco_usd"
@@ -275,9 +295,21 @@ def build_report(
             "NetApp-managed options preserve NFS/SMB and ONTAP features. With "
             "FabricPool tiering enabled, cold data is tiered to low-cost object "
             "storage, substantially lowering managed-file TCO versus keeping all "
-            "data on the performance tier."
+            "data on the performance tier. Ranking reflects the supplied customer "
+            "context; cost figures are authoritative."
         ),
     }
+
+
+def _explain(option: Dict[str, object], file_required: bool) -> str:
+    """Build a one-paragraph rationale for the top-ranked option."""
+    notes = option.get("rationale") or []
+    factors = "; ".join(notes) if notes else "lowest blended cost-and-fit score"
+    tco = option["horizon_tco_usd"]
+    return (
+        f"{option['provider']} ranks highest (score {option['total_score']}/100, "
+        f"3-yr TCO ${tco:,.0f}). Key factors: {factors}."
+    )
 
 
 def provider_table() -> List[str]:
