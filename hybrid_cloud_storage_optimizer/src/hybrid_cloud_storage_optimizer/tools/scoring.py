@@ -2,7 +2,7 @@
 
 The original recommendation logic was binary — "if NFS/SMB, pick the cheapest
 managed-file option" — which made FSx for NetApp ONTAP a near-universal answer.
-A real Solutions Engineer weighs many dimensions and presents a *ranked* shortlist
+Updates include weighing many dimensions and presents a *ranked* shortlist
 with trade-offs. This module scores every provider on a transparent, documented
 rubric so the ranking is explainable and testable (no LLM hand-waving). Dollar
 costs remain authoritative from ``pricing.py``; scoring only re-ranks fit.
@@ -63,6 +63,34 @@ class CustomerContext:
     existing_netapp_ela: bool = False  # BYOL/ELA favors CVO
     cloud_exit_optionality: bool = False  # portability favors CVO
     compliance: Sequence[str] = field(default_factory=tuple)  # e.g. ("fedramp",)
+
+
+_VALID_CLOUDS = {"aws", "azure", "gcp", "multi", ""}
+_VALID_PERF = {"high", "standard", "archive"}
+_VALID_BUDGET = {"cost", "balanced", "performance"}
+
+
+def context_from_dict(data: dict) -> CustomerContext:
+    """Build a CustomerContext from an arbitrary dict, ignoring unknown keys and
+    coercing invalid values to safe defaults. Tolerant by design (LLM/UI input)."""
+    data = data or {}
+
+    def _str(key: str, default: str, valid: set) -> str:
+        val = str(data.get(key, default) or default).strip().lower()
+        return val if val in valid else default
+
+    compliance = data.get("compliance") or []
+    if isinstance(compliance, str):
+        compliance = [c.strip() for c in compliance.split(",") if c.strip()]
+
+    return CustomerContext(
+        cloud_provider=_str("cloud_provider", "", _VALID_CLOUDS),
+        performance_tier=_str("performance_tier", "standard", _VALID_PERF),
+        budget_sensitivity=_str("budget_sensitivity", "balanced", _VALID_BUDGET),
+        existing_netapp_ela=bool(data.get("existing_netapp_ela", False)),
+        cloud_exit_optionality=bool(data.get("cloud_exit_optionality", False)),
+        compliance=tuple(str(c).strip().lower() for c in compliance),
+    )
 
 
 def _fit_score(
@@ -162,9 +190,7 @@ def score_options(
         profile = PROVIDER_PROFILES[provider]
         # Cheapest = 100; most expensive = 0. Degenerate span -> neutral 50.
         cost_score = 100.0 if span == 0 else 100.0 * (hi - tcos[provider]) / span
-        fit_score, notes = _fit_score(
-            provider, profile, ctx, needs_file_protocol
-        )
+        fit_score, notes = _fit_score(provider, profile, ctx, needs_file_protocol)
         total = round(w_cost * cost_score + w_fit * fit_score, 1)
         ranked.append(
             {

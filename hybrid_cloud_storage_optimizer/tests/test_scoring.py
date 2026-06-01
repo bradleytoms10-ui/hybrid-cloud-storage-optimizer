@@ -77,6 +77,39 @@ def test_protocol_requirement_penalizes_object_below_managed():
     assert scoring.PROVIDER_PROFILES[top["provider_key"]].serves_file_protocol
 
 
+def test_context_from_dict_tolerates_bad_values():
+    ctx = scoring.context_from_dict(
+        {
+            "cloud_provider": "AWS",
+            "performance_tier": "bogus",
+            "compliance": "fedramp, hipaa",
+        }
+    )
+    assert ctx.cloud_provider == "aws"
+    assert ctx.performance_tier == "standard"  # invalid coerced to default
+    assert ctx.compliance == ("fedramp", "hipaa")
+
+
+def test_context_changes_build_report_recommendation():
+    aws = pricing.build_report(
+        raw_or_used_tb=350,
+        dedup_ratio=2.0,
+        workload_profile="heavy NFS",
+        context=scoring.context_from_dict({"cloud_provider": "aws"}),
+    )
+    multi = pricing.build_report(
+        raw_or_used_tb=350,
+        dedup_ratio=2.0,
+        workload_profile="heavy NFS",
+        context=scoring.context_from_dict(
+            {"cloud_provider": "multi", "cloud_exit_optionality": True}
+        ),
+    )
+    assert aws["recommended_provider"] == "FSx for NetApp ONTAP"
+    assert multi["recommended_provider"] == "CVO"
+    assert "ranked_options" in aws and len(aws["ranked_options"]) == 6
+
+
 def test_every_option_has_rationale():
     ranked = scoring.score_options(
         COSTS, needs_file_protocol=True, context=CustomerContext(cloud_provider="aws")

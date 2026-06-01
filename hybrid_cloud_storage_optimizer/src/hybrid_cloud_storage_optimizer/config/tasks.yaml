@@ -22,19 +22,27 @@ estimate_costs:
       - growth_rate_percent = growth_rate_percent
       - needs_file_protocol = needs_file_protocol   (pass the boolean exactly as given)
       - enable_tiering = {enable_tiering}   (pass this boolean exactly as given)
+      - context_json = {customer_context_json}   (pass this string through verbatim)
     Do not invent, rename, or append any other fields. When enable_tiering is true the tool
-    applies NetApp FabricPool cold-tiering to managed-file options, which lowers their TCO —
-    reflect this in your explanation. Then present the tool's full cost table and base your
-    recommendation strictly on the tool's recommended_provider and reason.
+    applies NetApp FabricPool cold-tiering to managed-file options, which lowers their TCO.
+    The tool returns "ranked_options" (each with a score and rationale) that already weigh the
+    customer context (cloud footprint, performance, compliance, licensing, strategy) — your job
+    is to communicate them like a Solutions Engineer, NOT to default to one product.
   expected_output: >
-    Markdown table with all providers + reasoned recommendation paragraph that explicitly mentions when NetApp-managed services are preferred.
+    A ranked trade-off table of all providers (provider, category, 3-yr TCO, score) followed by:
+    (1) the recommended option with its rationale; (2) a brief "why not" for the runner-up;
+    (3) explicit stated assumptions and a confidence level; (4) if the customer context is thin,
+    2-3 discovery questions you would ask to refine the recommendation; (5) a one-line
+    sensitivity note (how the pick would change if budget vs. performance priorities shifted).
   agent: cloud_cost_estimator
 
 generate_plan:
   description: >
     Combine the storage analysis and cost estimates to create a professional, executive-ready migration plan.
-    Always include the full cost comparison table, clear phases, tools (Terraform, NetApp Cloud Volumes ONTAP, etc.), risks, timeline, rollback plan, and a clean Mermaid flowchart.
-    Highlight the recommended provider and the reasoning.
+    Always include the full ranked cost comparison table, clear phases, tools (Terraform, NetApp Cloud Volumes ONTAP, etc.), risks, timeline, rollback plan, and a clean Mermaid flowchart.
+    Highlight the recommended provider and the reasoning, and carry through the cost step's
+    stated assumptions, confidence level, "why not the runner-up", and any discovery questions —
+    write like a Solutions Engineer tailoring to this customer, not a one-size-fits-all default.
     The Mermaid diagram MUST use valid syntax: start with "flowchart LR", use edges of the
     form A[Label] -->|edge text| B[Label]. Do NOT use the invalid form "-->|text|>" (no extra
     ">" after the closing pipe). Keep node labels short and free of special characters.

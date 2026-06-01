@@ -4,12 +4,13 @@ Keeping the math in ``pricing.py`` makes it unit-testable without CrewAI; this
 module only handles the agent-facing schema, input validation, and error framing.
 """
 
+import json
 from typing import Any, Dict, Optional, Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from . import pricing
+from . import pricing, scoring
 
 
 class StorageCostCalculatorInput(BaseModel):
@@ -50,6 +51,14 @@ class StorageCostCalculatorInput(BaseModel):
         description="The original workload description text. Used only as a "
         "fallback to detect file-protocol need when needs_file_protocol is omitted.",
     )
+    context_json: str = Field(
+        "",
+        description="Optional JSON string of customer context that re-ranks the "
+        'recommendation, e.g. {"cloud_provider":"azure","performance_tier":"high",'
+        '"budget_sensitivity":"performance","existing_netapp_ela":true,'
+        '"cloud_exit_optionality":false,"compliance":["fedramp"]}. Pass it through '
+        "verbatim from the customer_context_json input; do not invent values.",
+    )
 
 
 class StorageCostCalculatorTool(BaseTool):
@@ -72,7 +81,14 @@ class StorageCostCalculatorTool(BaseTool):
         needs_file_protocol: Optional[bool] = None,
         enable_tiering: bool = True,
         workload_profile: str = "",
+        context_json: str = "",
     ) -> Dict[str, Any]:
+        context = None
+        if context_json:
+            try:
+                context = scoring.context_from_dict(json.loads(context_json))
+            except (ValueError, TypeError):
+                context = None  # tolerate malformed JSON -> neutral ranking
         try:
             return pricing.build_report(
                 raw_or_used_tb=capacity_tb,
@@ -82,6 +98,7 @@ class StorageCostCalculatorTool(BaseTool):
                 workload_profile=workload_profile,
                 file_protocol_required=needs_file_protocol,
                 enable_tiering=enable_tiering,
+                context=context,
             )
         except ValueError as exc:
             return {"error": f"Invalid input to storage_cost_calculator: {exc}"}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import json
 import os
 import sys
 
@@ -22,6 +23,17 @@ SAMPLE_INPUTS = {
         "expected 15% annual growth"
     ),
     "enable_tiering": True,
+    # Solutions-Engineer discovery context (drives the multi-factor ranking).
+    "customer_context_json": json.dumps(
+        {
+            "cloud_provider": "aws",
+            "performance_tier": "standard",
+            "budget_sensitivity": "balanced",
+            "existing_netapp_ela": False,
+            "cloud_exit_optionality": False,
+            "compliance": [],
+        }
+    ),
 }
 
 
