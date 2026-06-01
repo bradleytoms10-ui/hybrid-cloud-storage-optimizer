@@ -30,18 +30,18 @@ recommended target.
 
 Methodology: sized on effective (post-dedup) capacity; capacity grows at 15%/yr
 compounded **monthly** over 36 months; monthly egress = effective capacity × 20% hot
-× 1.0 turnover × egress rate. US-East list prices as of 2026-03. Excludes API/request
+× 1.0 turnover × egress rate. US-East list prices as of 2026-06. Excludes API/request
 charges, retrieval/early-delete fees, cold-tier (Glacier/Archive) and FabricPool
 savings — see the tool's `EXCLUDED_FROM_MODEL` note.
 
 | Provider | Type | Initial Monthly | 3-Year TCO |
 |---|---|---:|---:|
 | Google Cloud | Object Storage | $6,451 | $286,837 |
-| Azure Blob | Object Storage | $6,881 | $305,959 |
+| Azure Blob | Object Storage | $6,810 | $302,772 |
 | AWS S3 | Object Storage | $7,347 | $326,675 |
 | **FSx for NetApp ONTAP** | **NetApp Managed File** | **$11,290** | **$501,964** |
 | CVO | NetApp Managed File | $13,978 | $621,480 |
-| Azure NetApp Files (Std) | NetApp Managed File | $21,504 | $956,123 |
+| Azure NetApp Files (Std) | NetApp Managed File | $29,926 | $1,330,604 |
 
 **Recommendation:** FSx for NetApp ONTAP. Object storage is ~40% cheaper but cannot
 serve the NFS workload natively. FSxN is the lowest-cost NetApp-managed option that

@@ -32,6 +32,9 @@ generate_plan:
     Combine the storage analysis and cost estimates to create a professional, executive-ready migration plan.
     Always include the full cost comparison table, clear phases, tools (Terraform, NetApp Cloud Volumes ONTAP, etc.), risks, timeline, rollback plan, and a clean Mermaid flowchart.
     Highlight the recommended provider and the reasoning.
+    The Mermaid diagram MUST use valid syntax: start with "flowchart LR", use edges of the
+    form A[Label] -->|edge text| B[Label]. Do NOT use the invalid form "-->|text|>" (no extra
+    ">" after the closing pipe). Keep node labels short and free of special characters.
   expected_output: >
     Professional Markdown report with sections, full cost table, Mermaid diagram, and executive summary.
   agent: migration_architect

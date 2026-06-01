@@ -1,9 +1,9 @@
 [project]
 name = "hybrid_cloud_storage_optimizer"
 version = "0.1.0"
-description = "hybrid-cloud-storage-optimizer using crewAI"
-authors = [{ name = "Your Name", email = "you@example.com" }]
-requires-python = ">=3.10,<3.14"
+description = "Multi-agent AI system that analyzes on-prem NetApp ONTAP storage and recommends optimal hybrid-cloud migrations with 2026 TCO across 6 providers."
+authors = [{ name = "Bradley Toms", email = "bradleytoms10@gmail.com" }]
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "crewai==1.11.0",
     "litellm>=1.82.5",

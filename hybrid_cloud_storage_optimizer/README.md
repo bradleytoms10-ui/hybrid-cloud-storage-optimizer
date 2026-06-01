@@ -2,11 +2,15 @@
 
 **Multi-agent AI system that analyzes on-prem NetApp-style storage and intelligently recommends optimal hybrid-cloud migrations.**
 
+### 🔗 [Live Demo](https://hybrid-cloud-storage-optimizer-xjgtfuiuevzub2uugw4h2p.streamlit.app/)
+
+> Hosted on Streamlit Community Cloud. Idle apps sleep — the first load after inactivity takes ~30s to wake.
+
 Built to showcase my 5+ years as a Solutions Architect at NetApp and 8 months as an AI Analyst at CACI.
 
 ### What It Does
 - Analyzes ONTAP configs (capacity, utilization, NFS workloads, dedup, snapshots)
-- Calculates **accurate 2026 TCO** across 6 providers:
+- Calculates **2026 total cost of ownership (TCO)** across 6 providers (planning-grade list-price estimates):
   - AWS S3, Azure Blob, Google Cloud (object storage)
   - Cloud Volumes ONTAP (CVO), FSx for NetApp ONTAP, Azure NetApp Files (managed file services)
 - **Smart recommendation logic** — automatically prefers NetApp-managed file services when NFS/SMB protocol compatibility is needed, otherwise chooses the lowest-cost option
@@ -106,7 +110,4 @@ docker run --rm -p 8501:8501 --env-file .env hcso:latest
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for Docker details, hosted Streamlit Cloud
 setup, secrets handling, and observability env vars.
-
-<!-- After deploying, add your live demo link here:
-**🔗 Live demo:** https://your-app.streamlit.app -->
 

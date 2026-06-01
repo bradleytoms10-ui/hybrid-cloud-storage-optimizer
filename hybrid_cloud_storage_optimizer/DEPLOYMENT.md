@@ -49,12 +49,15 @@ reproducible virtualenv from `uv.lock`.
    - **Repository**: `bradleytoms10-ui/hybrid-cloud-storage-optimizer`
    - **Branch**: `main`
    - **Main file path**: `hybrid_cloud_storage_optimizer/src/hybrid_cloud_storage_optimizer/streamlit_app.py`
-4. Under **Advanced settings → Secrets**, add:
+4. Under **Advanced settings**, set the **Python version to 3.12**. This is
+   required — CrewAI 1.11 has no install candidate on Python 3.13, so the default
+   builder will fail with "No matching distribution found for crewai".
+5. In the same **Advanced settings → Secrets** box, add:
    ```toml
    GROQ_API_KEY = "gsk_your_key_here"
    MODEL = "groq/llama-3.3-70b-versatile"
    ```
-5. Deploy. Dependencies install from the repo-root `requirements.txt`; the app
+6. Deploy. Dependencies install from the repo-root `requirements.txt`; the app
    bootstraps `sys.path` so the package imports without a local install.
 
 Once live, drop the public URL into the README badge at the top.

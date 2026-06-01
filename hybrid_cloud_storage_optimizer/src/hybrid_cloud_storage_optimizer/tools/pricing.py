@@ -31,7 +31,7 @@ from typing import Dict, List, Optional
 GB_PER_TB = 1024
 MONTHS_PER_YEAR = 12
 
-PRICING_AS_OF = "2026-03"
+PRICING_AS_OF = "2026-06"
 PRICING_REGION = "US East"
 
 OBJECT_STORAGE = "Object Storage"
@@ -54,14 +54,23 @@ class ProviderRate:
     category: str
 
 
-# Public US-East list prices, captured 2026-03 (approximate, planning-grade).
+# Public US-East list prices, planning-grade (approximate; verified against
+# provider pricing pages as of PRICING_AS_OF). Object-storage = hot/standard tier.
+# NetApp-managed file rates assume production Multi-AZ deployments and vary with
+# region, throughput/IOPS, and capacity-pool tiering.
+#   AWS S3 Standard ............ $0.023/GB-mo (first 50 TB)
+#   Azure Blob Hot (LRS) ....... $0.018/GB-mo
+#   Google Cloud Standard ...... $0.020/GB-mo
+#   FSx for NetApp ONTAP (SSD) . ~$0.045/GB-mo (Multi-AZ; single-AZ is lower)
+#   Cloud Volumes ONTAP ........ ~$0.060/GB-mo (capacity-based, BYOL varies)
+#   Azure NetApp Files Standard  ~$0.147/GiB-mo
 PROVIDER_RATES: Dict[str, ProviderRate] = {
     "AWS_S3": ProviderRate(0.023, 0.09, OBJECT_STORAGE),
-    "Azure_Blob": ProviderRate(0.0184, 0.10, OBJECT_STORAGE),
+    "Azure_Blob": ProviderRate(0.018, 0.10, OBJECT_STORAGE),
     "Google_Cloud": ProviderRate(0.020, 0.08, OBJECT_STORAGE),
     "CVO": ProviderRate(0.060, 0.09, NETAPP_MANAGED_FILE),
     "FSx_for_NetApp_ONTAP": ProviderRate(0.045, 0.09, NETAPP_MANAGED_FILE),
-    "Azure_NetApp_Files_Standard": ProviderRate(0.10, 0.10, NETAPP_MANAGED_FILE),
+    "Azure_NetApp_Files_Standard": ProviderRate(0.147, 0.10, NETAPP_MANAGED_FILE),
 }
 
 # Tokens that indicate a file-protocol (NFS/SMB) workload requiring a managed
