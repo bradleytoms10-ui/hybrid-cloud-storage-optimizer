@@ -40,10 +40,18 @@ with col2:
         height=120,
     )
 
+enable_tiering = st.checkbox(
+    "Apply NetApp FabricPool cold-tiering to managed-file options",
+    value=True,
+    help="Tiers cold data from the managed performance tier to low-cost object "
+    "storage, substantially lowering NetApp-managed-file TCO.",
+)
+
 if st.button("🚀 Run Analysis", type="primary", use_container_width=True):
     inputs = {
         "storage_config": storage_config,
         "workload_profile": workload_profile,
+        "enable_tiering": enable_tiering,
     }
     try:
         validate_environment(os.getenv("MODEL", DEFAULT_MODEL))

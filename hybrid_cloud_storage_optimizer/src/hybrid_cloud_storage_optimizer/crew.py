@@ -4,7 +4,7 @@ from crewai import LLM, Agent, Crew, Process, Task
 from crewai.project import CrewBase, after_kickoff, agent, crew, task
 
 from .models import StorageAnalysis
-from .observability import get_logger, log_usage, tracing_enabled
+from .observability import get_logger, init_langfuse, log_usage, tracing_enabled
 from .tools.storage_cost_calculator import StorageCostCalculatorTool
 
 logger = get_logger()
@@ -90,10 +90,12 @@ class HybridCloudStorageOptimizer:
     def crew(self) -> Crew:
         """Creates the full Hybrid Cloud Storage Optimizer crew"""
         tracing = tracing_enabled()
+        langfuse = init_langfuse()
         logger.info(
-            "Starting crew | model=%s | tracing=%s",
+            "Starting crew | model=%s | tracing=%s | langfuse=%s",
             os.getenv("MODEL", DEFAULT_MODEL),
             tracing,
+            langfuse,
         )
         return Crew(
             agents=self.agents,

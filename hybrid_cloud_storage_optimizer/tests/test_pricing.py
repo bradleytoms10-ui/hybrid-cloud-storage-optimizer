@@ -117,16 +117,63 @@ def test_build_report_end_to_end_nfs():
     assert report["effective_capacity_after_dedup_tb"] == 175.0
     assert report["needs_file_protocol"] is True
     assert report["recommended_provider"] == "FSx for NetApp ONTAP"
+    # FabricPool tiering is on by default, so FSxN reflects the blended (tiered) TCO.
+    assert report["assumptions"]["fabricpool_tiering_enabled"] is True
+    assert math.isclose(
+        report["three_year_tco_recommended_usd"], 361733.02, rel_tol=1e-3
+    )
+    assert report["assumptions"]["pricing_as_of"] == pricing.PRICING_AS_OF
+
+
+def test_build_report_untiered_matches_list_price_tco():
+    report = pricing.build_report(
+        raw_or_used_tb=350,
+        dedup_ratio=2.0,
+        workload_profile="heavy NFS workloads, ONTAP",
+        enable_tiering=False,
+    )
     assert math.isclose(
         report["three_year_tco_recommended_usd"], 501964.33, rel_tol=1e-3
     )
-    assert report["assumptions"]["pricing_as_of"] == pricing.PRICING_AS_OF
 
 
 def test_build_report_surfaces_validation_errors_via_tool(monkeypatch):
     # build_report should raise on bad input (tool layer converts to a message).
     with pytest.raises(ValueError):
         pricing.build_report(raw_or_used_tb=-5)
+
+
+# --------------------------------------------------------------------------- #
+# FabricPool cold-tiering
+# --------------------------------------------------------------------------- #
+def test_tiering_lowers_managed_file_tco_but_not_object():
+    tiered = pricing.calculate_tco(effective_tb=175, enable_tiering=True)
+    untiered = pricing.calculate_tco(effective_tb=175, enable_tiering=False)
+
+    # Managed-file targets get cheaper with tiering on.
+    for key in ("FSx_for_NetApp_ONTAP", "CVO", "Azure_NetApp_Files_Standard"):
+        assert tiered[key]["horizon_tco_usd"] < untiered[key]["horizon_tco_usd"]
+        assert tiered[key]["fabricpool_tiering_applied"] is True
+
+    # Object storage is unaffected by tiering.
+    for key in ("AWS_S3", "Azure_Blob", "Google_Cloud"):
+        assert tiered[key]["horizon_tco_usd"] == untiered[key]["horizon_tco_usd"]
+        assert tiered[key]["fabricpool_tiering_applied"] is False
+
+
+def test_tiering_blended_rate_math():
+    # hot 20% on FSxN ($0.045) + cold 80% on S3 capacity tier ($0.023)
+    costs = pricing.calculate_tco(effective_tb=100, hot_percent=20, enable_tiering=True)
+    expected = 0.20 * 0.045 + 0.80 * pricing.FABRICPOOL_CAPACITY_TIER_RATE
+    assert costs["FSx_for_NetApp_ONTAP"][
+        "effective_storage_rate_per_gb"
+    ] == pytest.approx(expected, abs=1e-6)
+
+
+def test_tiering_off_reproduces_list_rate():
+    costs = pricing.calculate_tco(effective_tb=100, enable_tiering=False)
+    fsx = costs["FSx_for_NetApp_ONTAP"]
+    assert fsx["effective_storage_rate_per_gb"] == fsx["list_storage_rate_per_gb"]
 
 
 def test_explicit_file_protocol_flag_overrides_text_inference():

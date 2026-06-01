@@ -21,6 +21,7 @@ SAMPLE_INPUTS = {
         "Mixed hot/cold data, frequent access to 20%, archival 80%, "
         "expected 15% annual growth"
     ),
+    "enable_tiering": True,
 }
 
 

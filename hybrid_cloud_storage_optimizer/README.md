@@ -13,6 +13,7 @@ Built to showcase my 5+ years as a Solutions Architect at NetApp and 8 months as
 - Calculates **2026 total cost of ownership (TCO)** across 6 providers (planning-grade list-price estimates):
   - AWS S3, Azure Blob, Google Cloud (object storage)
   - Cloud Volumes ONTAP (CVO), FSx for NetApp ONTAP, Azure NetApp Files (managed file services)
+- **NetApp FabricPool cold-tiering** (toggle, default on) — tiers cold/archival data from the managed performance tier to low-cost object storage, modeling realistic ONTAP economics
 - **Smart recommendation logic** — automatically prefers NetApp-managed file services when NFS/SMB protocol compatibility is needed, otherwise chooses the lowest-cost option
 - Generates a full executive-ready migration plan with phases, tools (Terraform, NetApp Cloud Volumes ONTAP, etc.), risks, timeline, rollback strategy, and Mermaid diagram
 - Includes an interactive **Streamlit web UI** for live demos
@@ -66,8 +67,8 @@ Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate
 
 8. **Interactive UI + Deployment**  
    A Streamlit web UI for live demos, a multi-stage Docker image, env-driven
-   observability (structured logging + CrewAI tracing), and Streamlit Cloud
-   deployment. See [DEPLOYMENT.md](DEPLOYMENT.md).
+   observability (structured logging, CrewAI tracing, and optional Langfuse LLM
+   tracing), and Streamlit Cloud deployment. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
 The project uses a clean `src/` layout with `pyproject.toml` + `uv` for reproducible installs.
 

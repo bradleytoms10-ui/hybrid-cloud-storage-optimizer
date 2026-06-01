@@ -103,12 +103,19 @@ def _require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+# FabricPool capacity tier: cold blocks tiered off a NetApp-managed performance
+# tier land on low-cost object storage. We model that tier at the AWS S3 rate.
+FABRICPOOL_CAPACITY_TIER_RATE = PROVIDER_RATES["AWS_S3"].storage_per_gb_month
+
+
 def calculate_tco(
     effective_tb: float,
     hot_percent: float = 20.0,
     annual_growth_percent: float = 15.0,
     egress_turnover_per_month: float = 1.0,
     horizon_years: int = 3,
+    enable_tiering: bool = True,
+    capacity_tier_rate_per_gb: float = FABRICPOOL_CAPACITY_TIER_RATE,
 ) -> Dict[str, Dict[str, float]]:
     """Compute per-provider TCO over the horizon, compounding growth monthly.
 
@@ -118,23 +125,39 @@ def calculate_tco(
         annual_growth_percent: Expected annual capacity growth, percent. >= 0.
         egress_turnover_per_month: Times the hot set is read out per month. >= 0.
         horizon_years: TCO horizon in whole years. >= 1.
+        enable_tiering: When True, NetApp-managed targets use FabricPool tiering —
+            hot data stays on the managed rate and cold data is tiered to the
+            object-storage capacity tier. Object-storage targets are unaffected.
+        capacity_tier_rate_per_gb: $/GB-month for the FabricPool capacity tier.
 
     Returns:
-        Mapping of provider -> cost breakdown (initial monthly figures and total
-        TCO over the horizon).
+        Mapping of provider -> cost breakdown (initial monthly figures, blended
+        effective storage rate, and total TCO over the horizon).
     """
     _require(effective_tb > 0, "effective_tb must be greater than 0")
     _require(0 <= hot_percent <= 100, "hot_percent must be between 0 and 100")
     _require(annual_growth_percent >= 0, "annual_growth_percent must be >= 0")
     _require(egress_turnover_per_month >= 0, "egress_turnover_per_month must be >= 0")
     _require(horizon_years >= 1, "horizon_years must be >= 1")
+    _require(capacity_tier_rate_per_gb > 0, "capacity_tier_rate_per_gb must be > 0")
 
     months = horizon_years * MONTHS_PER_YEAR
     monthly_growth = (1 + annual_growth_percent / 100) ** (1 / MONTHS_PER_YEAR)
     hot_fraction = hot_percent / 100
+    cold_fraction = 1 - hot_fraction
 
     results: Dict[str, Dict[str, float]] = {}
     for provider, rate in PROVIDER_RATES.items():
+        tiered = enable_tiering and rate.category == NETAPP_MANAGED_FILE
+        if tiered:
+            # Blended rate: hot stays on the managed tier, cold tiers to object.
+            effective_rate = (
+                hot_fraction * rate.storage_per_gb_month
+                + cold_fraction * capacity_tier_rate_per_gb
+            )
+        else:
+            effective_rate = rate.storage_per_gb_month
+
         total_storage = 0.0
         total_egress = 0.0
         initial_storage = 0.0
@@ -142,7 +165,7 @@ def calculate_tco(
 
         for month in range(months):
             capacity_gb = effective_tb * GB_PER_TB * (monthly_growth**month)
-            storage_cost = capacity_gb * rate.storage_per_gb_month
+            storage_cost = capacity_gb * effective_rate
             egress_cost = (
                 capacity_gb
                 * hot_fraction
@@ -157,6 +180,9 @@ def calculate_tco(
 
         results[provider] = {
             "category": rate.category,
+            "list_storage_rate_per_gb": rate.storage_per_gb_month,
+            "effective_storage_rate_per_gb": round(effective_rate, 5),
+            "fabricpool_tiering_applied": tiered,
             "initial_monthly_storage_usd": round(initial_storage, 2),
             "initial_monthly_egress_usd": round(initial_egress, 2),
             "initial_monthly_total_usd": round(initial_storage + initial_egress, 2),
@@ -200,12 +226,14 @@ def build_report(
     horizon_years: int = 3,
     workload_profile: str = "",
     file_protocol_required: Optional[bool] = None,
+    enable_tiering: bool = True,
 ) -> Dict[str, object]:
     """End-to-end: derive effective capacity, compute TCO, and recommend.
 
     ``file_protocol_required`` is authoritative when provided (e.g. passed from the
     upstream StorageAnalysis). When ``None``, it is inferred from ``workload_profile``
-    keywords as a fallback.
+    keywords as a fallback. ``enable_tiering`` applies FabricPool cold-tiering to
+    NetApp-managed targets (default on).
     """
     eff = effective_capacity_tb(raw_or_used_tb, dedup_ratio)
     costs = calculate_tco(
@@ -214,6 +242,7 @@ def build_report(
         annual_growth_percent=annual_growth_percent,
         egress_turnover_per_month=egress_turnover_per_month,
         horizon_years=horizon_years,
+        enable_tiering=enable_tiering,
     )
     file_required = (
         file_protocol_required
@@ -232,6 +261,8 @@ def build_report(
             "hot_percent": hot_percent,
             "annual_growth_percent": annual_growth_percent,
             "egress_turnover_per_month": egress_turnover_per_month,
+            "fabricpool_tiering_enabled": enable_tiering,
+            "fabricpool_capacity_tier_rate_per_gb": FABRICPOOL_CAPACITY_TIER_RATE,
             "excluded_from_model": EXCLUDED_FROM_MODEL,
         },
         "costs": costs,
@@ -241,9 +272,10 @@ def build_report(
         ],
         "reason": rec["reason"],
         "note": (
-            "NetApp-managed options cost more than object storage but preserve "
-            "NFS/SMB and ONTAP features. Tiering cold data would lower object-"
-            "storage TCO further."
+            "NetApp-managed options preserve NFS/SMB and ONTAP features. With "
+            "FabricPool tiering enabled, cold data is tiered to low-cost object "
+            "storage, substantially lowering managed-file TCO versus keeping all "
+            "data on the performance tier."
         ),
     }
 

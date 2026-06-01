@@ -40,6 +40,11 @@ class StorageCostCalculatorInput(BaseModel):
         "access. Pass the value from the upstream StorageAnalysis. This is "
         "authoritative; when omitted, it is inferred from workload_profile text.",
     )
+    enable_tiering: bool = Field(
+        True,
+        description="Apply NetApp FabricPool cold-tiering to managed-file targets "
+        "(cold data tiered to low-cost object storage). Default true.",
+    )
     workload_profile: str = Field(
         "",
         description="The original workload description text. Used only as a "
@@ -65,6 +70,7 @@ class StorageCostCalculatorTool(BaseTool):
         hot_percent: float = 20.0,
         growth_rate_percent: float = 15.0,
         needs_file_protocol: Optional[bool] = None,
+        enable_tiering: bool = True,
         workload_profile: str = "",
     ) -> Dict[str, Any]:
         try:
@@ -75,6 +81,7 @@ class StorageCostCalculatorTool(BaseTool):
                 annual_growth_percent=growth_rate_percent,
                 workload_profile=workload_profile,
                 file_protocol_required=needs_file_protocol,
+                enable_tiering=enable_tiering,
             )
         except ValueError as exc:
             return {"error": f"Invalid input to storage_cost_calculator: {exc}"}

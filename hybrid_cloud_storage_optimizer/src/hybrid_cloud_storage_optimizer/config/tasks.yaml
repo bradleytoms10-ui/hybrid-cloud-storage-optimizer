@@ -21,8 +21,11 @@ estimate_costs:
       - hot_percent = hot_data_percent
       - growth_rate_percent = growth_rate_percent
       - needs_file_protocol = needs_file_protocol   (pass the boolean exactly as given)
-    Do not invent, rename, or append any other fields. Then present the tool's full cost table and
-    base your recommendation strictly on the tool's recommended_provider and reason.
+      - enable_tiering = {enable_tiering}   (pass this boolean exactly as given)
+    Do not invent, rename, or append any other fields. When enable_tiering is true the tool
+    applies NetApp FabricPool cold-tiering to managed-file options, which lowers their TCO —
+    reflect this in your explanation. Then present the tool's full cost table and base your
+    recommendation strictly on the tool's recommended_provider and reason.
   expected_output: >
     Markdown table with all providers + reasoned recommendation paragraph that explicitly mentions when NetApp-managed services are preferred.
   agent: cloud_cost_estimator

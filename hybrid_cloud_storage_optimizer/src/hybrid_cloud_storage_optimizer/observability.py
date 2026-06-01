@@ -32,6 +32,41 @@ def tracing_enabled() -> bool:
     return os.getenv("CREWAI_TRACING_ENABLED", "false").lower() == "true"
 
 
+def init_langfuse() -> bool:
+    """Enable Langfuse LLM tracing if its keys are present.
+
+    CrewAI calls models through LiteLLM, so registering Langfuse as a LiteLLM
+    callback captures every prompt/response, token count, and latency in the
+    Langfuse dashboard. No-op (and safe) when keys or the package are missing, so
+    this never breaks a normal run. Requires the optional dependency:
+        uv sync --group tracing      (installs the 'langfuse' package)
+    and these env vars: LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST.
+    """
+    log = get_logger()
+    if not (os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY")):
+        return False
+    try:
+        import litellm
+    except ImportError:
+        return False
+    try:
+        import langfuse  # noqa: F401
+    except ImportError:
+        log.warning(
+            "LANGFUSE keys set but the 'langfuse' package is not installed; "
+            "run `uv sync --group tracing`. Skipping Langfuse."
+        )
+        return False
+
+    for attr in ("success_callback", "failure_callback"):
+        callbacks = list(getattr(litellm, attr, None) or [])
+        if "langfuse" not in callbacks:
+            callbacks.append("langfuse")
+            setattr(litellm, attr, callbacks)
+    log.info("Langfuse tracing enabled")
+    return True
+
+
 def log_usage(result) -> None:
     """Log token usage and per-task summary from a CrewOutput, if available."""
     log = get_logger()

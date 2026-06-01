@@ -14,8 +14,10 @@ The on-prem ONTAP cluster holds ~350 TB of used capacity (500 TB raw at 70%
 utilization), reducing to **175 TB effective** after 2:1 deduplication. The workload
 is NFS-heavy, so object storage is not a drop-in target — preserving NFS/SMB semantics
 and ONTAP features requires a NetApp-managed file service. Among those, **Amazon FSx
-for NetApp ONTAP (FSxN)** delivers the lowest 3-year TCO (~$502K) and is the
-recommended target.
+for NetApp ONTAP (FSxN)** delivers the lowest 3-year TCO and is the recommended target.
+With **NetApp FabricPool cold-tiering** enabled (80% archival data tiered to low-cost
+object storage), FSxN's 3-year TCO drops from ~$502K to **~$362K** — within ~12% of
+pure object storage while keeping full NFS/SMB and ONTAP capability.
 
 ## Storage Analysis
 
@@ -30,24 +32,29 @@ recommended target.
 
 Methodology: sized on effective (post-dedup) capacity; capacity grows at 15%/yr
 compounded **monthly** over 36 months; monthly egress = effective capacity × 20% hot
-× 1.0 turnover × egress rate. US-East list prices as of 2026-06. Excludes API/request
-charges, retrieval/early-delete fees, cold-tier (Glacier/Archive) and FabricPool
-savings — see the tool's `EXCLUDED_FROM_MODEL` note.
+× 1.0 turnover × egress rate. US-East list prices as of 2026-06. **FabricPool tiering
+ON**: managed-file targets keep hot data on the performance tier and tier the 80% cold
+data to the object-storage capacity tier (AWS S3 rate). Excludes API/request charges,
+retrieval/early-delete fees, snapshot/backup capacity, and support — see the tool's
+`EXCLUDED_FROM_MODEL` note.
 
-| Provider | Type | Initial Monthly | 3-Year TCO |
-|---|---|---:|---:|
-| Google Cloud | Object Storage | $6,451 | $286,837 |
-| Azure Blob | Object Storage | $6,810 | $302,772 |
-| AWS S3 | Object Storage | $7,347 | $326,675 |
-| **FSx for NetApp ONTAP** | **NetApp Managed File** | **$11,290** | **$501,964** |
-| CVO | NetApp Managed File | $13,978 | $621,480 |
-| Azure NetApp Files (Std) | NetApp Managed File | $29,926 | $1,330,604 |
+| Provider | Type | FabricPool | Initial Monthly | 3-Year TCO |
+|---|---|:--:|---:|---:|
+| Google Cloud | Object Storage | — | $6,451 | $286,837 |
+| Azure Blob | Object Storage | — | $6,810 | $302,772 |
+| AWS S3 | Object Storage | — | $7,347 | $326,675 |
+| **FSx for NetApp ONTAP** | **NetApp Managed File** | ✓ | **$8,136** | **$361,733** |
+| CVO | NetApp Managed File | ✓ | $8,673 | $385,636 |
+| Azure NetApp Files (Std) | NetApp Managed File | ✓ | $12,150 | $540,209 |
 
-**Recommendation:** FSx for NetApp ONTAP. Object storage is ~40% cheaper but cannot
-serve the NFS workload natively. FSxN is the lowest-cost NetApp-managed option that
-preserves ONTAP features (snapshots, SnapMirror, dedup) and NFS/SMB access. Object
-storage remains a complementary FabricPool tier for the 80% cold data, which would
-narrow the gap further.
+(Without tiering, the managed-file TCOs are higher — e.g. FSxN $501,964, CVO $621,480,
+ANF $1,330,604. Toggle tiering off in the UI or via `enable_tiering=false`.)
+
+**Recommendation:** FSx for NetApp ONTAP. Object storage is cheaper but cannot serve
+the NFS workload natively. FSxN is the lowest-cost NetApp-managed option that preserves
+ONTAP features (snapshots, SnapMirror, dedup) and NFS/SMB access, and with FabricPool
+tiering its TCO lands within ~12% of object storage — a strong case for keeping ONTAP
+capabilities without a major cost premium.
 
 ## Phased Migration Plan
 

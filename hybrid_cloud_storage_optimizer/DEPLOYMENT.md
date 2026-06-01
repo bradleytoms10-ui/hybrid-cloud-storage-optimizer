@@ -70,3 +70,22 @@ Set these env vars (locally, in Docker, or in Streamlit secrets) to turn on diag
 LOG_LEVEL=DEBUG               # verbose app logging
 CREWAI_TRACING_ENABLED=true   # CrewAI execution traces
 ```
+
+### Langfuse LLM tracing (optional)
+
+For a hosted dashboard of every prompt, response, token count, and latency:
+
+1. Install the optional dependency:
+   ```bash
+   uv sync --group tracing
+   ```
+2. Create a project at https://cloud.langfuse.com (or self-host) and set:
+   ```bash
+   LANGFUSE_PUBLIC_KEY=pk-lf-...
+   LANGFUSE_SECRET_KEY=sk-lf-...
+   LANGFUSE_HOST=https://cloud.langfuse.com
+   ```
+3. Run the crew normally. CrewAI calls models via LiteLLM, and the app registers
+   Langfuse as a LiteLLM callback at startup (look for `langfuse=True` in the log),
+   so every LLM call streams into your Langfuse dashboard. Without the keys or the
+   package, this is a safe no-op.
