@@ -68,5 +68,23 @@ generate_plan:
     form A[Label] -->|edge text| B[Label]. Do NOT use the invalid form "-->|text|>" (no extra
     ">" after the closing pipe). Keep node labels short and free of special characters.
   expected_output: >
-    Professional Markdown report with sections, full cost table, Mermaid diagram, and executive summary.
+    A professional Markdown report following this exact section order:
+      ## Executive Summary  — 2-4 sentences: the recommendation, its 3-yr TCO, and the single
+        most important reason, framed for a decision-maker.
+      ## Current State  — effective capacity, protocol need, key inefficiencies/triggers.
+      ## Options & Costs  — the full ranked trade-off table (provider, category, FabricPool,
+        3-yr TCO, score), then the recommendation, the "why not the runner-up", and stated
+        assumptions + confidence level.
+      ## Migration Plan  — numbered phases (Assess & Design → Provision → Seed/Replicate via
+        SnapMirror → Validate → Cutover → Optimize), each one sentence.
+      ## Tools  — Terraform, SnapMirror, NetApp Cloud Manager, etc.
+      ## Risks & Mitigations  — 3-4 concrete pairs.
+      ## Timeline  — phased weeks.
+      ## Rollback  — read-only source until validation passes.
+      ## Open Questions  — the discovery questions to confirm with the customer.
+      ## Architecture  — a valid Mermaid `flowchart LR` (edges as A[Label] -->|text| B[Label]).
+    Tone exemplar (match this voice): "FSx for NetApp ONTAP is recommended at a 3-year TCO of
+    ~$362K: it serves the NFS workload natively, fits the customer's AWS footprint, and—with
+    FabricPool tiering the 80% cold tier to S3—lands within ~12% of object-only storage while
+    preserving ONTAP data services." Be specific and customer-tailored; never generic.
   agent: migration_architect
