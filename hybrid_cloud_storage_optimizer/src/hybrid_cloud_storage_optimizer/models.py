@@ -14,7 +14,9 @@ from pydantic import BaseModel, Field
 class StorageAnalysis(BaseModel):
     """Structured result of the on-prem storage analysis task."""
 
-    summary: str = Field(..., description="Concise narrative summary of the environment.")
+    summary: str = Field(
+        ..., description="Concise narrative summary of the environment."
+    )
     raw_capacity_tb: float = Field(..., description="Total raw capacity in TB.")
     used_capacity_tb: float = Field(
         ..., description="Used capacity in TB before deduplication."

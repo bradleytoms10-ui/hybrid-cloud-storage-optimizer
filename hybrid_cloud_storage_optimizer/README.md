@@ -60,13 +60,16 @@ Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate
    GitHub Actions pipeline that runs ruff + black + pytest on every push. The live
    crew smoke test is a separate manual job, so a missing secret never breaks CI.
 
-8. **Interactive UI**  
-   A Streamlit web UI for live demos.
+8. **Interactive UI + Deployment**  
+   A Streamlit web UI for live demos, a multi-stage Docker image, env-driven
+   observability (structured logging + CrewAI tracing), and Streamlit Cloud
+   deployment. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
 The project uses a clean `src/` layout with `pyproject.toml` + `uv` for reproducible installs.
 
-#### Roadmap (not yet implemented)
-Dockerfile, structured logging/tracing/observability, and Streamlit Cloud deployment.
+#### Roadmap
+Live cloud-pricing API integration, cold-tier (FabricPool/Glacier) modeling, and a
+hosted Langfuse tracing dashboard.
 
 
 ### How to Run
@@ -94,3 +97,16 @@ uv run pytest -q
 uv run ruff check .
 uv run black --check .
 ```
+
+**Docker**
+```bash
+docker build -t hcso:latest .
+docker run --rm -p 8501:8501 --env-file .env hcso:latest
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Docker details, hosted Streamlit Cloud
+setup, secrets handling, and observability env vars.
+
+<!-- After deploying, add your live demo link here:
+**🔗 Live demo:** https://your-app.streamlit.app -->
+

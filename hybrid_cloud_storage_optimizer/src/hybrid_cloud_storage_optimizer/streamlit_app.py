@@ -1,12 +1,18 @@
 import os
+import sys
+from pathlib import Path
 
-import streamlit as st
+# Make the package importable when run directly (e.g. Streamlit Community Cloud,
+# which does not pip-install the local project). src/ is two levels up.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from hybrid_cloud_storage_optimizer.crew import (
+import streamlit as st  # noqa: E402
+
+from hybrid_cloud_storage_optimizer.crew import (  # noqa: E402
     DEFAULT_MODEL,
     HybridCloudStorageOptimizer,
 )
-from hybrid_cloud_storage_optimizer.env import (
+from hybrid_cloud_storage_optimizer.env import (  # noqa: E402
     ConfigError,
     friendly_error,
     validate_environment,

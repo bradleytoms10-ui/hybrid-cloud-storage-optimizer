@@ -1,0 +1,5 @@
+# Runtime dependencies for Streamlit Community Cloud deployment.
+# (Local dev uses uv + pyproject.toml; this mirrors the runtime deps.)
+crewai[tools]==1.11.0
+litellm>=1.82.5
+streamlit>=1.55.0

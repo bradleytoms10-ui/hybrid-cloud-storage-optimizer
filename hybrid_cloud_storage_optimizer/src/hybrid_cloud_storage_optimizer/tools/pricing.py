@@ -163,9 +163,7 @@ def recommend(
     otherwise the lowest-TCO option overall."""
     if file_protocol_required:
         candidates = {
-            p: v
-            for p, v in results.items()
-            if v["category"] == NETAPP_MANAGED_FILE
+            p: v for p, v in results.items() if v["category"] == NETAPP_MANAGED_FILE
         }
         reason = (
             "Workload requires NFS/SMB file-protocol access; NetApp-managed file "

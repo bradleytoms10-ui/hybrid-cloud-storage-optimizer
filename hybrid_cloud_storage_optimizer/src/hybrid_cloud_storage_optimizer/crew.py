@@ -1,9 +1,13 @@
 import os
 
-from crewai import LLM, Agent, Task, Crew, Process
-from crewai.project import CrewBase, agent, task, crew
+from crewai import LLM, Agent, Crew, Process, Task
+from crewai.project import CrewBase, after_kickoff, agent, crew, task
+
 from .models import StorageAnalysis
+from .observability import get_logger, log_usage, tracing_enabled
 from .tools.storage_cost_calculator import StorageCostCalculatorTool
+
+logger = get_logger()
 
 # Single source of truth for the model. Override via the MODEL env var
 # (set in .env or CI secrets); falls back to a sensible default.
@@ -76,12 +80,25 @@ class HybridCloudStorageOptimizer:
             agent=self.migration_architect(),
         )
 
+    @after_kickoff
+    def log_run(self, result):
+        """Emit token usage / task summary after each run (observability)."""
+        log_usage(result)
+        return result
+
     @crew
     def crew(self) -> Crew:
         """Creates the full Hybrid Cloud Storage Optimizer crew"""
+        tracing = tracing_enabled()
+        logger.info(
+            "Starting crew | model=%s | tracing=%s",
+            os.getenv("MODEL", DEFAULT_MODEL),
+            tracing,
+        )
         return Crew(
             agents=self.agents,
             tasks=self.tasks,
             process=Process.sequential,
             verbose=True,
+            tracing=tracing,
         )

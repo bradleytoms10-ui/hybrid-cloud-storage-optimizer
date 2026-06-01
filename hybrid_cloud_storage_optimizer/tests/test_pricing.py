@@ -58,12 +58,12 @@ def test_growth_increases_tco_but_less_than_flat_multiplier():
     """Regression guard against the old bug that multiplied every month by the
     full 3-year growth factor. Compounded growth must lie strictly between the
     no-growth total and that (incorrect) inflated total."""
-    no_growth = pricing.calculate_tco(
-        effective_tb=175, annual_growth_percent=0
-    )["AWS_S3"]["horizon_tco_usd"]
-    with_growth = pricing.calculate_tco(
-        effective_tb=175, annual_growth_percent=15
-    )["AWS_S3"]["horizon_tco_usd"]
+    no_growth = pricing.calculate_tco(effective_tb=175, annual_growth_percent=0)[
+        "AWS_S3"
+    ]["horizon_tco_usd"]
+    with_growth = pricing.calculate_tco(effective_tb=175, annual_growth_percent=15)[
+        "AWS_S3"
+    ]["horizon_tco_usd"]
     flat_buggy = no_growth * (1.15**3)  # the old over-counting behaviour
 
     assert with_growth > no_growth
@@ -149,6 +149,9 @@ def test_explicit_file_protocol_flag_overrides_text_inference():
         file_protocol_required=False,
     )
     assert report2["needs_file_protocol"] is False
-    assert pricing.PROVIDER_RATES[
-        report2["recommended_provider"].replace(" ", "_")
-    ].category == pricing.OBJECT_STORAGE
+    assert (
+        pricing.PROVIDER_RATES[
+            report2["recommended_provider"].replace(" ", "_")
+        ].category
+        == pricing.OBJECT_STORAGE
+    )
