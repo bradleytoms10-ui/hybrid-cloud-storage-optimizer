@@ -18,6 +18,7 @@ from hybrid_cloud_storage_optimizer.env import (  # noqa: E402
     friendly_error,
     validate_environment,
 )
+from hybrid_cloud_storage_optimizer.tools import artifacts  # noqa: E402
 
 st.set_page_config(
     page_title="Hybrid Cloud Storage Optimizer", page_icon="☁️", layout="wide"
@@ -79,6 +80,14 @@ with st.expander("🧭 Customer Discovery (optional — shapes the recommendatio
         height=80,
         placeholder="Free-form notes the agents should weigh.",
     )
+    uploaded = st.file_uploader(
+        "Upload artifacts (RFPs, assessments, monitoring exports) — PDF/CSV/TXT/MD",
+        type=["pdf", "csv", "txt", "md", "log", "json"],
+        accept_multiple_files=True,
+        help="Text is extracted and given to the agents. Diagrams/images are not "
+        "read by the current model. Do not upload confidential data to the public "
+        "demo — nothing is persisted, but it is sent to the model provider.",
+    )
 
 if st.button("🚀 Run Analysis", type="primary", use_container_width=True):
     context = {
@@ -92,6 +101,11 @@ if st.button("🚀 Run Analysis", type="primary", use_container_width=True):
     profile = workload_profile
     if extra_context.strip():
         profile = f"{workload_profile}\n\nAdditional context: {extra_context.strip()}"
+    if uploaded:
+        files = [(f.name, f.getvalue()) for f in uploaded]
+        artifact_text = artifacts.combine_artifacts(files)
+        if artifact_text:
+            profile = f"{profile}\n\n{artifact_text}"
     inputs = {
         "storage_config": storage_config,
         "workload_profile": profile,

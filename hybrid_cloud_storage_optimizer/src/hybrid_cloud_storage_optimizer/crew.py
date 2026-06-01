@@ -3,7 +3,7 @@ import os
 from crewai import LLM, Agent, Crew, Process, Task
 from crewai.project import CrewBase, after_kickoff, agent, crew, task
 
-from .models import StorageAnalysis
+from .models import CustomerContext, StorageAnalysis
 from .observability import get_logger, init_langfuse, log_usage, tracing_enabled
 from .tools.storage_cost_calculator import StorageCostCalculatorTool
 
@@ -31,6 +31,15 @@ class HybridCloudStorageOptimizer:
     tasks_config = "config/tasks.yaml"
 
     @agent
+    def requirements_analyst(self) -> Agent:
+        return Agent(
+            config=self.agents_config["requirements_analyst"],
+            llm=_build_llm(),
+            allow_delegation=False,
+            verbose=True,
+        )
+
+    @agent
     def storage_analyst(self) -> Agent:
         return Agent(
             config=self.agents_config["storage_analyst"],
@@ -56,6 +65,14 @@ class HybridCloudStorageOptimizer:
             llm=_build_llm(),
             allow_delegation=False,
             verbose=True,
+        )
+
+    @task
+    def discover_context(self) -> Task:
+        return Task(
+            config=self.tasks_config["discover_context"],
+            agent=self.requirements_analyst(),
+            output_pydantic=CustomerContext,
         )
 
     @task

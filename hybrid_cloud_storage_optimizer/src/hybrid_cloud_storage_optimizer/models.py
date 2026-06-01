@@ -46,3 +46,38 @@ class StorageAnalysis(BaseModel):
     recommendations: List[str] = Field(
         default_factory=list, description="Optimization or migration recommendations."
     )
+
+
+class CustomerContext(BaseModel):
+    """Structured Solutions-Engineer discovery context.
+
+    Produced by the discovery agent from free-form input + uploaded artifacts +
+    any explicit UI hints. Serialized to JSON and passed to the cost calculator,
+    where it drives the multi-factor recommendation ranking.
+    """
+
+    cloud_provider: str = Field(
+        "",
+        description="Primary cloud footprint: 'aws', 'azure', 'gcp', 'multi', or "
+        "'' if unknown. Infer from mentions of the provider in the input.",
+    )
+    performance_tier: str = Field(
+        "standard",
+        description="'high' (latency-sensitive), 'standard', or 'archive' (cold).",
+    )
+    budget_sensitivity: str = Field(
+        "balanced",
+        description="'cost', 'balanced', or 'performance' — the customer's priority.",
+    )
+    existing_netapp_ela: bool = Field(
+        False,
+        description="True if the customer has an existing NetApp ELA/BYOL licensing.",
+    )
+    cloud_exit_optionality: bool = Field(
+        False,
+        description="True if multi-cloud portability / cloud-exit flexibility matters.",
+    )
+    compliance: List[str] = Field(
+        default_factory=list,
+        description="Compliance regimes mentioned, e.g. ['fedramp', 'hipaa'].",
+    )

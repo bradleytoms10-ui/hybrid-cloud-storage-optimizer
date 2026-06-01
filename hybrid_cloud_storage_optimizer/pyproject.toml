@@ -8,6 +8,7 @@ dependencies = [
     "crewai==1.11.0",
     "litellm>=1.82.5",
     "streamlit>=1.55.0",
+    "pypdf>=4.0",
 ]
 
 [project.scripts]

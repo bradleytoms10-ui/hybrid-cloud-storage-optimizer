@@ -17,6 +17,14 @@ The app needs a `GROQ_API_KEY` (provider key for the LLM). It is **never** commi
 
 If a key is ever exposed, rotate it at https://console.groq.com/keys.
 
+### Uploads & privacy
+
+The UI can ingest customer artifacts (RFPs, assessments, monitoring exports as
+PDF/CSV/text). Extracted text is sent to the LLM provider as prompt context and is
+**not persisted server-side**. Image diagrams are not read by the default text model.
+Do not upload confidential or regulated data to the **public** demo; for sensitive
+material, run locally or in your own Docker/Streamlit deployment.
+
 ## 1. Local (uv)
 
 ```bash

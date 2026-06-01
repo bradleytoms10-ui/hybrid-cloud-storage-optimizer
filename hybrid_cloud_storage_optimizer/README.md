@@ -14,7 +14,7 @@ Built to showcase my 5+ years as a Solutions Architect at NetApp and 8 months as
   - AWS S3, Azure Blob, Google Cloud (object storage)
   - Cloud Volumes ONTAP (CVO), FSx for NetApp ONTAP, Azure NetApp Files (managed file services)
 - **NetApp FabricPool cold-tiering** (toggle, default on) — tiers cold/archival data from the managed performance tier to low-cost object storage, modeling realistic ONTAP economics
-- **Solutions-Engineer context awareness** — a Customer Discovery form (cloud footprint, performance posture, budget priority, compliance, existing NetApp ELA, cloud-exit strategy) feeds a transparent multi-factor scoring engine that returns a *ranked* trade-off shortlist with rationale — not a one-size-fits-all default
+- **Solutions-Engineer context awareness** — a Customer Discovery form (cloud footprint, performance posture, budget priority, compliance, existing NetApp ELA, cloud-exit strategy) plus **artifact uploads** (RFPs, assessments, monitoring exports as PDF/CSV/text) feed a dedicated **discovery agent** that produces structured context for a transparent multi-factor scoring engine — returning a *ranked* trade-off shortlist with rationale, not a one-size-fits-all default
 - **Smart recommendation logic** — weighs cost, cloud affinity, performance, compliance, licensing, and strategy; prefers NetApp-managed file services when NFS/SMB is required, but adapts the pick to the customer's context
 - Generates a full executive-ready migration plan with phases, tools (Terraform, NetApp Cloud Volumes ONTAP, etc.), risks, timeline, rollback strategy, and Mermaid diagram
 - Includes an interactive **Streamlit web UI** for live demos
@@ -42,7 +42,7 @@ Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate
 
 4. **YAML-First Configuration **  
    Replaced the default demo with declarative YAML files:
-   - `agents.yaml` — defines three specialized agents with roles, goals, and backstories
+   - `agents.yaml` — defines four specialized agents (requirements/discovery, storage analyst, cost estimator, migration architect) with roles, goals, and backstories
    - `tasks.yaml` — defines sequential tasks with clear expected outputs  
    Updated `crew.py` with the official `@CrewBase` pattern. The LLM is set once from the
    `MODEL` environment variable (default `groq/llama-3.3-70b-versatile`) as a single source of truth.

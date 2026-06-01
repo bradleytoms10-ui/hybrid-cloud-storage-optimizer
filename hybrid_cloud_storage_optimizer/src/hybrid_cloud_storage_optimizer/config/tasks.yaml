@@ -1,3 +1,21 @@
+discover_context:
+  description: >
+    Run customer discovery. Inputs:
+      - Explicit context hints (JSON, may be partial or empty): {customer_context_json}
+      - Workload profile and any uploaded artifact text: {workload_profile}
+    Produce a structured CustomerContext. Rules:
+      - Honor every non-empty value in the explicit hints exactly.
+      - For unset fields, infer conservatively from evidence in the workload/artifacts
+        (e.g. mentions of AWS/Azure/GCP set cloud_provider; "FedRAMP"/"HIPAA"/"GDPR" fill
+        compliance; latency/IOPS emphasis implies performance_tier=high; "archive/cold"
+        implies archive; an existing NetApp/ONTAP estate or ELA sets existing_netapp_ela;
+        "avoid lock-in"/"multi-cloud" sets cloud_exit_optionality).
+      - Leave a field at its default when there is no supporting evidence; do not guess.
+  expected_output: >
+    A CustomerContext object with cloud_provider, performance_tier, budget_sensitivity,
+    existing_netapp_ela, cloud_exit_optionality, and compliance.
+  agent: requirements_analyst
+
 analyze_storage:
   description: >
     Given this storage configuration: {storage_config}
@@ -22,7 +40,10 @@ estimate_costs:
       - growth_rate_percent = growth_rate_percent
       - needs_file_protocol = needs_file_protocol   (pass the boolean exactly as given)
       - enable_tiering = {enable_tiering}   (pass this boolean exactly as given)
-      - context_json = {customer_context_json}   (pass this string through verbatim)
+      - context_json = the CustomerContext from the discovery task, serialized as a
+        compact JSON string (e.g. {"cloud_provider":"azure","performance_tier":"high",
+        "budget_sensitivity":"balanced","existing_netapp_ela":false,
+        "cloud_exit_optionality":false,"compliance":[]})
     Do not invent, rename, or append any other fields. When enable_tiering is true the tool
     applies NetApp FabricPool cold-tiering to managed-file options, which lowers their TCO.
     The tool returns "ranked_options" (each with a score and rationale) that already weigh the
