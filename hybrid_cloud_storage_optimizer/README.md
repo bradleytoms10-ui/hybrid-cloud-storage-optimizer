@@ -97,11 +97,17 @@ uv run crewai run
 uv run streamlit run src/hybrid_cloud_storage_optimizer/streamlit_app.py
 ```
 
-**Tests** (deterministic, no API key needed)
+**Tests & quality** (deterministic, no API key needed)
 ```bash
-uv run pytest -q
-uv run ruff check .
-uv run black --check .
+make test          # uv run pytest -q
+make check         # ruff + black --check (matches CI)
+make format        # auto-format + auto-fix before committing
+```
+
+**Pre-commit hooks** (auto-run black + ruff on every commit, so CI never fails on formatting)
+```bash
+uv sync                                                  # installs pre-commit (dev group)
+uv run pre-commit install --config ../.pre-commit-config.yaml
 ```
 
 **Docker**

@@ -1,0 +1,21 @@
+# Pre-commit hooks. Install once with:  uv run pre-commit install
+# (run from the hybrid_cloud_storage_optimizer/ subfolder, or with the --config flag).
+#
+# These use the project's own uv-pinned black & ruff so local formatting matches
+# CI exactly — no more surprise "black --check" failures on push. The repo root is
+# the AI/ folder, so each hook cd's into the project before running uv.
+repos:
+  - repo: local
+    hooks:
+      - id: black
+        name: black (auto-format)
+        entry: bash -c 'cd hybrid_cloud_storage_optimizer && uv run black .'
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: ruff
+        name: ruff (lint --fix)
+        entry: bash -c 'cd hybrid_cloud_storage_optimizer && uv run ruff check . --fix'
+        language: system
+        pass_filenames: false
+        types: [python]
