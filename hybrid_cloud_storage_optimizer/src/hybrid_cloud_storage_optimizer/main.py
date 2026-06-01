@@ -12,6 +12,7 @@ from hybrid_cloud_storage_optimizer.env import (
     friendly_error,
     validate_environment,
 )
+from hybrid_cloud_storage_optimizer.formatting import clean_output
 
 SAMPLE_INPUTS = {
     "storage_config": (
@@ -53,7 +54,7 @@ def run():
     print("\n" + "=" * 80)
     print("FINAL CREW OUTPUT - HYBRID CLOUD STORAGE OPTIMIZER")
     print("=" * 80)
-    print(result)
+    print(clean_output(str(result)))
     print("=" * 80)
 
 

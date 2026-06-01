@@ -18,6 +18,7 @@ from hybrid_cloud_storage_optimizer.env import (  # noqa: E402
     friendly_error,
     validate_environment,
 )
+from hybrid_cloud_storage_optimizer.formatting import clean_output  # noqa: E402
 from hybrid_cloud_storage_optimizer.tools import artifacts  # noqa: E402
 
 st.set_page_config(
@@ -117,7 +118,7 @@ if st.button("🚀 Run Analysis", type="primary", use_container_width=True):
         with st.spinner("Agents are collaborating... This may take 20–40 seconds"):
             result = HybridCloudStorageOptimizer().crew().kickoff(inputs=inputs)
         st.success("✅ Analysis Complete!")
-        st.markdown(result)
+        st.markdown(clean_output(str(result)))
     except ConfigError as exc:
         st.warning(str(exc))
     except Exception as exc:  # noqa: BLE001 - show one clean message, not a traceback
