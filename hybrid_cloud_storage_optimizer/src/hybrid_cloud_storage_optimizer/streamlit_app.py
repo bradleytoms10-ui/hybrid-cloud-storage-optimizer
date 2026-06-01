@@ -76,6 +76,24 @@ with st.expander("🧭 Customer Discovery (optional — shapes the recommendatio
     with dc3:
         existing_netapp_ela = st.checkbox("Existing NetApp ELA / BYOL")
         cloud_exit_optionality = st.checkbox("Cloud-exit optionality matters")
+    fc1, fc2 = st.columns(2)
+    with fc1:
+        provisioned_throughput_mbps = st.number_input(
+            "Sustained throughput to provision (MBps, 0 = n/a)",
+            min_value=0,
+            value=0,
+            step=100,
+            help="Adds performance cost for throughput-billed services (FSxN, CVO).",
+        )
+    with fc2:
+        on_prem_annual_usd = st.number_input(
+            "Current on-prem annual storage spend (USD, 0 = unknown)",
+            min_value=0,
+            value=0,
+            step=10000,
+            help="Enables the % TCO-reduction business case vs the customer's "
+            "current spend.",
+        )
     extra_context = st.text_area(
         "Additional context (pain points, constraints, success criteria)",
         height=80,
@@ -98,6 +116,8 @@ if st.button("🚀 Run Analysis", type="primary", use_container_width=True):
         "existing_netapp_ela": existing_netapp_ela,
         "cloud_exit_optionality": cloud_exit_optionality,
         "compliance": [c.strip() for c in compliance_raw.split(",") if c.strip()],
+        "provisioned_throughput_mbps": provisioned_throughput_mbps,
+        "on_prem_annual_usd": on_prem_annual_usd,
     }
     profile = workload_profile
     if extra_context.strip():

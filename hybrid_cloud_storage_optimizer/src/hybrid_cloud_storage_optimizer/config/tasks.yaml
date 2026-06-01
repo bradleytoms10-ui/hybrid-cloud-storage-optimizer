@@ -11,9 +11,12 @@ discover_context:
         implies archive; an existing NetApp/ONTAP estate or ELA sets existing_netapp_ela;
         "avoid lock-in"/"multi-cloud" sets cloud_exit_optionality).
       - Leave a field at its default when there is no supporting evidence; do not guess.
+      - Copy provisioned_throughput_mbps and on_prem_annual_usd through from the hints
+        verbatim (0 if absent) — do not infer or alter these two numbers.
   expected_output: >
     A CustomerContext object with cloud_provider, performance_tier, budget_sensitivity,
-    existing_netapp_ela, cloud_exit_optionality, and compliance.
+    existing_netapp_ela, cloud_exit_optionality, compliance, provisioned_throughput_mbps,
+    and on_prem_annual_usd.
   agent: requirements_analyst
 
 analyze_storage:
@@ -52,9 +55,11 @@ estimate_costs:
   expected_output: >
     A ranked trade-off table of all providers (provider, category, 3-yr TCO, score) followed by:
     (1) the recommended option with its rationale; (2) a brief "why not" for the runner-up;
-    (3) explicit stated assumptions and a confidence level; (4) if the customer context is thin,
-    2-3 discovery questions you would ask to refine the recommendation; (5) a one-line
-    sensitivity note (how the pick would change if budget vs. performance priorities shifted).
+    (3) the business_case from the tool — state the % TCO reduction vs the customer's current
+    spend and whether it meets their target, or, if no baseline was provided, say so and ask for
+    it; (4) explicit stated assumptions and a confidence level; (5) if the customer context is
+    thin, 2-3 discovery questions to refine the recommendation; (6) a one-line sensitivity note
+    (how the pick would change if budget vs. performance priorities shifted).
   agent: cloud_cost_estimator
 
 generate_plan:
@@ -75,6 +80,9 @@ generate_plan:
       ## Options & Costs  — the full ranked trade-off table (provider, category, FabricPool,
         3-yr TCO, score), then the recommendation, the "why not the runner-up", and stated
         assumptions + confidence level.
+      ## Business Case  — the % TCO reduction vs the customer's current spend and whether it
+        meets their target (from the tool's business_case); if no baseline was given, say a
+        reduction can't be quantified yet and list it as an open question.
       ## Migration Plan  — numbered phases (Assess & Design → Provision → Seed/Replicate via
         SnapMirror → Validate → Cutover → Optimize), each one sentence.
       ## Tools  — Terraform, SnapMirror, NetApp Cloud Manager, etc.

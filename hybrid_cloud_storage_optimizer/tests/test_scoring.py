@@ -110,6 +110,20 @@ def test_context_changes_build_report_recommendation():
     assert "ranked_options" in aws and len(aws["ranked_options"]) == 6
 
 
+def test_protocol_required_never_recommends_object_even_when_cheaper():
+    # Even with a throughput surcharge making managed file pricier and a cloud
+    # mismatch, object storage must not be the #1 pick when NFS is required.
+    costs = pricing.calculate_tco(effective_tb=175, provisioned_throughput_mbps=800)
+    ranked = scoring.score_options(
+        costs,
+        needs_file_protocol=True,
+        context=CustomerContext(cloud_provider="azure"),
+    )
+    top = ranked[0]
+    assert scoring.PROVIDER_PROFILES[top["provider_key"]].serves_file_protocol
+    assert top["eligible"] is True
+
+
 def test_every_option_has_rationale():
     ranked = scoring.score_options(
         COSTS, needs_file_protocol=True, context=CustomerContext(cloud_provider="aws")

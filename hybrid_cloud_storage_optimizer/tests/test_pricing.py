@@ -125,6 +125,62 @@ def test_build_report_end_to_end_nfs():
     assert report["assumptions"]["pricing_as_of"] == pricing.PRICING_AS_OF
 
 
+def test_throughput_surcharge_applies_only_to_decoupled_providers():
+    base = pricing.calculate_tco(effective_tb=175)
+    perf = pricing.calculate_tco(effective_tb=175, provisioned_throughput_mbps=500)
+    # FSxN and CVO bill throughput separately -> cost rises.
+    assert (
+        perf["FSx_for_NetApp_ONTAP"]["horizon_tco_usd"]
+        > base["FSx_for_NetApp_ONTAP"]["horizon_tco_usd"]
+    )
+    assert perf["CVO"]["horizon_tco_usd"] > base["CVO"]["horizon_tco_usd"]
+    # Object storage and ANF (bundled throughput) are unchanged.
+    for key in ("AWS_S3", "Azure_Blob", "Google_Cloud", "Azure_NetApp_Files_Standard"):
+        assert perf[key]["horizon_tco_usd"] == base[key]["horizon_tco_usd"]
+
+
+def test_throughput_cost_math():
+    base = pricing.calculate_tco(effective_tb=175)["FSx_for_NetApp_ONTAP"][
+        "horizon_tco_usd"
+    ]
+    perf = pricing.calculate_tco(effective_tb=175, provisioned_throughput_mbps=500)[
+        "FSx_for_NetApp_ONTAP"
+    ]["horizon_tco_usd"]
+    # 500 MBps * $0.78/MBps-mo * 36 months
+    assert perf - base == pytest.approx(500 * 0.78 * 36, abs=0.01)
+
+
+def test_business_case_without_baseline():
+    bc = pricing.build_report(
+        raw_or_used_tb=350, dedup_ratio=2.0, workload_profile="heavy NFS"
+    )["business_case"]
+    assert bc["baseline_provided"] is False
+    assert "recommended_annual_usd" in bc
+
+
+def test_business_case_meets_target():
+    bc = pricing.build_report(
+        raw_or_used_tb=350,
+        dedup_ratio=2.0,
+        workload_profile="heavy NFS",
+        on_prem_annual_usd=220000,
+    )["business_case"]
+    assert bc["baseline_provided"] is True
+    # 3-yr recommended ~361,733 vs 660,000 baseline -> ~45% reduction.
+    assert bc["meets_target"] is True
+    assert bc["tco_reduction_percent"] > 30
+
+
+def test_business_case_falls_short():
+    bc = pricing.build_report(
+        raw_or_used_tb=350,
+        dedup_ratio=2.0,
+        workload_profile="heavy NFS",
+        on_prem_annual_usd=130000,
+    )["business_case"]
+    assert bc["meets_target"] is False
+
+
 def test_build_report_untiered_matches_list_price_tco():
     report = pricing.build_report(
         raw_or_used_tb=350,

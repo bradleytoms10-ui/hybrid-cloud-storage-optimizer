@@ -33,6 +33,8 @@ SAMPLE_INPUTS = {
             "existing_netapp_ela": False,
             "cloud_exit_optionality": False,
             "compliance": [],
+            "provisioned_throughput_mbps": 0,
+            "on_prem_annual_usd": 220000,
         }
     ),
 }

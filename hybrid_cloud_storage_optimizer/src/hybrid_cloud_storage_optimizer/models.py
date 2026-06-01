@@ -81,3 +81,14 @@ class CustomerContext(BaseModel):
         default_factory=list,
         description="Compliance regimes mentioned, e.g. ['fedramp', 'hipaa'].",
     )
+    provisioned_throughput_mbps: float = Field(
+        0.0,
+        description="Sustained throughput to provision (MBps). Copy through from the "
+        "hints verbatim; 0 if not specified. Drives performance cost.",
+    )
+    on_prem_annual_usd: float = Field(
+        0.0,
+        description="Customer's current on-prem annual storage spend (USD). Copy "
+        "through from the hints verbatim; 0 if unknown. Drives the % TCO-reduction "
+        "business case.",
+    )

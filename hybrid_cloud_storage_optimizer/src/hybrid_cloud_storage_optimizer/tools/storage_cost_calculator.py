@@ -56,8 +56,12 @@ class StorageCostCalculatorInput(BaseModel):
         description="Optional JSON string of customer context that re-ranks the "
         'recommendation, e.g. {"cloud_provider":"azure","performance_tier":"high",'
         '"budget_sensitivity":"performance","existing_netapp_ela":true,'
-        '"cloud_exit_optionality":false,"compliance":["fedramp"]}. Pass it through '
-        "verbatim from the customer_context_json input; do not invent values.",
+        '"cloud_exit_optionality":false,"compliance":["fedramp"],'
+        '"provisioned_throughput_mbps":500,"on_prem_annual_usd":200000}. The last two '
+        "keys are optional: provisioned_throughput_mbps adds performance cost for "
+        "throughput-billed services, and on_prem_annual_usd drives the TCO-reduction "
+        "business case. Pass it through verbatim from the customer_context_json input; "
+        "do not invent values.",
     )
 
 
@@ -84,9 +88,15 @@ class StorageCostCalculatorTool(BaseTool):
         context_json: str = "",
     ) -> Dict[str, Any]:
         context = None
+        throughput_mbps = 0.0
+        on_prem_annual = 0.0
         if context_json:
             try:
-                context = scoring.context_from_dict(json.loads(context_json))
+                data = json.loads(context_json)
+                context = scoring.context_from_dict(data)
+                # Cost inputs ride the same JSON channel to avoid bloating tool args.
+                throughput_mbps = float(data.get("provisioned_throughput_mbps", 0) or 0)
+                on_prem_annual = float(data.get("on_prem_annual_usd", 0) or 0)
             except (ValueError, TypeError):
                 context = None  # tolerate malformed JSON -> neutral ranking
         try:
@@ -99,6 +109,8 @@ class StorageCostCalculatorTool(BaseTool):
                 file_protocol_required=needs_file_protocol,
                 enable_tiering=enable_tiering,
                 context=context,
+                provisioned_throughput_mbps=throughput_mbps,
+                on_prem_annual_usd=on_prem_annual,
             )
         except ValueError as exc:
             return {"error": f"Invalid input to storage_cost_calculator: {exc}"}

@@ -10,6 +10,8 @@ Built to showcase my 5+ years as a Solutions Architect at NetApp and 8 months as
 
 ### What It Does
 - Analyzes ONTAP configs (capacity, utilization, NFS workloads, dedup, snapshots)
+- Builds a **business case**: computes the % 3-year TCO reduction vs the customer's current on-prem spend and whether it meets their target (e.g., 30%)
+- Models **performance cost**: provisioned throughput (MBps) adds cost for throughput-billed services (FSxN, CVO), so quotes aren't capacity-only
 - Calculates **2026 total cost of ownership (TCO)** across 6 providers (planning-grade list-price estimates):
   - AWS S3, Azure Blob, Google Cloud (object storage)
   - Cloud Volumes ONTAP (CVO), FSx for NetApp ONTAP, Azure NetApp Files (managed file services)

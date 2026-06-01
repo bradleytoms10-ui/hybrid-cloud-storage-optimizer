@@ -54,11 +54,19 @@ EXCLUDED_FROM_MODEL = (
 
 @dataclass(frozen=True)
 class ProviderRate:
-    """List-price rates for one storage target."""
+    """List-price rates for one storage target.
+
+    ``throughput_per_mbps_month`` models provisioned-throughput cost for managed
+    file services that decouple throughput from capacity (FSxN, CVO). It is a
+    planning-grade approximation. Azure NetApp Files is left at 0 here because its
+    throughput is bundled into the capacity-tier rate (Standard 16 / Premium 64 /
+    Ultra 128 MiB/s per TiB); object storage has no provisioned throughput.
+    """
 
     storage_per_gb_month: float
     egress_per_gb: float
     category: str
+    throughput_per_mbps_month: float = 0.0
 
 
 # Public US-East list prices, planning-grade (approximate; verified against
@@ -71,12 +79,15 @@ class ProviderRate:
 #   FSx for NetApp ONTAP (SSD) . ~$0.045/GB-mo (Multi-AZ; single-AZ is lower)
 #   Cloud Volumes ONTAP ........ ~$0.060/GB-mo (capacity-based, BYOL varies)
 #   Azure NetApp Files Standard  ~$0.147/GiB-mo
+# Throughput rates ($/MBps-month) are planning-grade approximations for providers
+# that provision throughput separately (FSxN, CVO); confirm against the provider
+# calculator for a quote. ANF/object are 0 (bundled / not provisioned).
 PROVIDER_RATES: Dict[str, ProviderRate] = {
     "AWS_S3": ProviderRate(0.023, 0.09, OBJECT_STORAGE),
     "Azure_Blob": ProviderRate(0.018, 0.10, OBJECT_STORAGE),
     "Google_Cloud": ProviderRate(0.020, 0.08, OBJECT_STORAGE),
-    "CVO": ProviderRate(0.060, 0.09, NETAPP_MANAGED_FILE),
-    "FSx_for_NetApp_ONTAP": ProviderRate(0.045, 0.09, NETAPP_MANAGED_FILE),
+    "CVO": ProviderRate(0.060, 0.09, NETAPP_MANAGED_FILE, 0.90),
+    "FSx_for_NetApp_ONTAP": ProviderRate(0.045, 0.09, NETAPP_MANAGED_FILE, 0.78),
     "Azure_NetApp_Files_Standard": ProviderRate(0.147, 0.10, NETAPP_MANAGED_FILE),
 }
 
@@ -123,6 +134,7 @@ def calculate_tco(
     horizon_years: int = 3,
     enable_tiering: bool = True,
     capacity_tier_rate_per_gb: float = FABRICPOOL_CAPACITY_TIER_RATE,
+    provisioned_throughput_mbps: float = 0.0,
 ) -> Dict[str, Dict[str, float]]:
     """Compute per-provider TCO over the horizon, compounding growth monthly.
 
@@ -136,6 +148,9 @@ def calculate_tco(
             hot data stays on the managed rate and cold data is tiered to the
             object-storage capacity tier. Object-storage targets are unaffected.
         capacity_tier_rate_per_gb: $/GB-month for the FabricPool capacity tier.
+        provisioned_throughput_mbps: Sustained throughput to provision (MBps).
+            Adds a monthly throughput cost for providers that bill throughput
+            separately (FSxN, CVO). 0 disables (default), preserving prior numbers.
 
     Returns:
         Mapping of provider -> cost breakdown (initial monthly figures, blended
@@ -147,6 +162,9 @@ def calculate_tco(
     _require(egress_turnover_per_month >= 0, "egress_turnover_per_month must be >= 0")
     _require(horizon_years >= 1, "horizon_years must be >= 1")
     _require(capacity_tier_rate_per_gb > 0, "capacity_tier_rate_per_gb must be > 0")
+    _require(
+        provisioned_throughput_mbps >= 0, "provisioned_throughput_mbps must be >= 0"
+    )
 
     months = horizon_years * MONTHS_PER_YEAR
     monthly_growth = (1 + annual_growth_percent / 100) ** (1 / MONTHS_PER_YEAR)
@@ -164,6 +182,11 @@ def calculate_tco(
             )
         else:
             effective_rate = rate.storage_per_gb_month
+
+        # Provisioned-throughput cost (flat monthly; 0 for object/ANF/no-throughput).
+        monthly_throughput = (
+            rate.throughput_per_mbps_month * provisioned_throughput_mbps
+        )
 
         total_storage = 0.0
         total_egress = 0.0
@@ -185,6 +208,7 @@ def calculate_tco(
                 initial_storage = storage_cost
                 initial_egress = egress_cost
 
+        total_throughput = monthly_throughput * months
         results[provider] = {
             "category": rate.category,
             "list_storage_rate_per_gb": rate.storage_per_gb_month,
@@ -192,8 +216,13 @@ def calculate_tco(
             "fabricpool_tiering_applied": tiered,
             "initial_monthly_storage_usd": round(initial_storage, 2),
             "initial_monthly_egress_usd": round(initial_egress, 2),
-            "initial_monthly_total_usd": round(initial_storage + initial_egress, 2),
-            "horizon_tco_usd": round(total_storage + total_egress, 2),
+            "initial_monthly_throughput_usd": round(monthly_throughput, 2),
+            "initial_monthly_total_usd": round(
+                initial_storage + initial_egress + monthly_throughput, 2
+            ),
+            "horizon_tco_usd": round(
+                total_storage + total_egress + total_throughput, 2
+            ),
         }
     return results
 
@@ -235,6 +264,9 @@ def build_report(
     file_protocol_required: Optional[bool] = None,
     enable_tiering: bool = True,
     context: Optional[CustomerContext] = None,
+    provisioned_throughput_mbps: float = 0.0,
+    on_prem_annual_usd: float = 0.0,
+    target_reduction_percent: float = 30.0,
 ) -> Dict[str, object]:
     """End-to-end: derive effective capacity, compute TCO, score, and recommend.
 
@@ -244,7 +276,10 @@ def build_report(
     NetApp-managed targets (default on). ``context`` is the Solutions-Engineer
     discovery context; when provided it drives a multi-factor ranking so the
     recommendation reflects cloud affinity, performance, compliance, licensing, and
-    strategy — not just cost. Cost figures remain authoritative.
+    strategy — not just cost. ``provisioned_throughput_mbps`` adds performance cost
+    for throughput-billed services. ``on_prem_annual_usd`` is the customer's current
+    annual storage spend; when > 0 a business case (% TCO reduction vs the
+    ``target_reduction_percent`` goal) is computed. Cost figures remain authoritative.
     """
     eff = effective_capacity_tb(raw_or_used_tb, dedup_ratio)
     costs = calculate_tco(
@@ -254,6 +289,7 @@ def build_report(
         egress_turnover_per_month=egress_turnover_per_month,
         horizon_years=horizon_years,
         enable_tiering=enable_tiering,
+        provisioned_throughput_mbps=provisioned_throughput_mbps,
     )
     file_required = (
         file_protocol_required
@@ -269,6 +305,10 @@ def build_report(
         "recommended_provider_key": top["provider_key"],
         "reason": _explain(top, file_required),
     }
+    recommended_tco = costs[rec["recommended_provider_key"]]["horizon_tco_usd"]
+    business_case = _business_case(
+        recommended_tco, horizon_years, on_prem_annual_usd, target_reduction_percent
+    )
 
     return {
         "effective_capacity_after_dedup_tb": round(eff, 2),
@@ -280,6 +320,7 @@ def build_report(
             "hot_percent": hot_percent,
             "annual_growth_percent": annual_growth_percent,
             "egress_turnover_per_month": egress_turnover_per_month,
+            "provisioned_throughput_mbps": provisioned_throughput_mbps,
             "fabricpool_tiering_enabled": enable_tiering,
             "fabricpool_capacity_tier_rate_per_gb": FABRICPOOL_CAPACITY_TIER_RATE,
             "excluded_from_model": EXCLUDED_FROM_MODEL,
@@ -287,9 +328,8 @@ def build_report(
         "costs": costs,
         "ranked_options": ranked,
         "recommended_provider": rec["recommended_provider"],
-        "three_year_tco_recommended_usd": costs[rec["recommended_provider_key"]][
-            "horizon_tco_usd"
-        ],
+        "three_year_tco_recommended_usd": recommended_tco,
+        "business_case": business_case,
         "reason": rec["reason"],
         "note": (
             "NetApp-managed options preserve NFS/SMB and ONTAP features. With "
@@ -310,6 +350,51 @@ def _explain(option: Dict[str, object], file_required: bool) -> str:
         f"{option['provider']} ranks highest (score {option['total_score']}/100, "
         f"3-yr TCO ${tco:,.0f}). Key factors: {factors}."
     )
+
+
+def _business_case(
+    recommended_tco: float,
+    horizon_years: int,
+    on_prem_annual_usd: float,
+    target_reduction_percent: float,
+) -> Dict[str, object]:
+    """Build the TCO-reduction business case vs the customer's current spend.
+
+    Without a supplied baseline we cannot claim a reduction — say so explicitly
+    rather than imply savings (a common credibility failure in SE deliverables).
+    """
+    recommended_annual = recommended_tco / horizon_years
+    if on_prem_annual_usd <= 0:
+        return {
+            "baseline_provided": False,
+            "recommended_annual_usd": round(recommended_annual, 2),
+            "target_reduction_percent": target_reduction_percent,
+            "summary": (
+                "No current on-prem annual spend was provided, so a % TCO reduction "
+                "cannot be computed. Capture the customer's current annual storage "
+                f"cost to validate the {target_reduction_percent:.0f}% reduction goal. "
+                f"Recommended cloud run-rate is ~${recommended_annual:,.0f}/yr."
+            ),
+        }
+    baseline_horizon = on_prem_annual_usd * horizon_years
+    reduction_pct = (baseline_horizon - recommended_tco) / baseline_horizon * 100
+    meets = reduction_pct >= target_reduction_percent
+    verb = "meets" if meets else "falls short of"
+    return {
+        "baseline_provided": True,
+        "on_prem_annual_usd": round(on_prem_annual_usd, 2),
+        "on_prem_horizon_usd": round(baseline_horizon, 2),
+        "recommended_annual_usd": round(recommended_annual, 2),
+        "tco_reduction_percent": round(reduction_pct, 1),
+        "target_reduction_percent": target_reduction_percent,
+        "meets_target": meets,
+        "summary": (
+            f"Recommended {horizon_years}-yr TCO ${recommended_tco:,.0f} vs current "
+            f"${baseline_horizon:,.0f} (${on_prem_annual_usd:,.0f}/yr) is a "
+            f"{reduction_pct:.0f}% reduction, which {verb} the "
+            f"{target_reduction_percent:.0f}% target."
+        ),
+    }
 
 
 def provider_table() -> List[str]:

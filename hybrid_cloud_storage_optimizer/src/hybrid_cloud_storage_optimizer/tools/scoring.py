@@ -201,9 +201,15 @@ def score_options(
                 "cost_score": round(cost_score, 1),
                 "fit_score": round(fit_score, 1),
                 "total_score": total,
+                # Object storage cannot natively serve a required file protocol, so
+                # it is ineligible to be the primary recommendation (it may still be
+                # a complementary tier). Hard constraint, not a soft penalty.
+                "eligible": (not needs_file_protocol) or profile.serves_file_protocol,
                 "rationale": notes,
             }
         )
 
-    ranked.sort(key=lambda r: r["total_score"], reverse=True)
+    # Eligible options first, then by blended score. Guarantees the top pick can
+    # actually serve the workload even when an ineligible option is cheaper.
+    ranked.sort(key=lambda r: (r["eligible"], r["total_score"]), reverse=True)
     return ranked
