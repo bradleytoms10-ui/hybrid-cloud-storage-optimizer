@@ -29,9 +29,10 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 try:  # package import (production)
-    from . import scoring
+    from . import compliance, scoring
     from .scoring import CustomerContext
 except ImportError:  # standalone import (isolated tests)
+    import compliance
     import scoring
     from scoring import CustomerContext
 
@@ -296,6 +297,10 @@ def build_report(
         if file_protocol_required is not None
         else needs_file_protocol(workload_profile)
     )
+    ctx = context or CustomerContext()
+    compliance_guidance = compliance.build_compliance_guidance(
+        list(ctx.compliance), ctx.cloud_provider
+    )
     ranked = scoring.score_options(
         costs, needs_file_protocol=file_required, context=context
     )
@@ -327,9 +332,16 @@ def build_report(
         },
         "costs": costs,
         "ranked_options": ranked,
+        "excluded_options": [
+            {"provider": o["provider"], "reason": o["ineligible_reason"]}
+            for o in ranked
+            if not o["eligible"]
+        ],
         "recommended_provider": rec["recommended_provider"],
         "three_year_tco_recommended_usd": recommended_tco,
         "business_case": business_case,
+        "compliance_guidance": compliance_guidance,
+        "data_protection": compliance.data_protection_guidance(),
         "reason": rec["reason"],
         "note": (
             "NetApp-managed options preserve NFS/SMB and ONTAP features. With "

@@ -17,6 +17,8 @@ Built to showcase my 5+ years as a Solutions Architect at NetApp and 8 months as
   - Cloud Volumes ONTAP (CVO), FSx for NetApp ONTAP, Azure NetApp Files (managed file services)
 - **NetApp FabricPool cold-tiering** (toggle, default on) — tiers cold/archival data from the managed performance tier to low-cost object storage, modeling realistic ONTAP economics
 - **Solutions-Engineer context awareness** — a Customer Discovery form (cloud footprint, performance posture, budget priority, compliance, existing NetApp ELA, cloud-exit strategy) plus **artifact uploads** (RFPs, assessments, monitoring exports as PDF/CSV/text) feed a dedicated **discovery agent** that produces structured context for a transparent multi-factor scoring engine — returning a *ranked* trade-off shortlist with rationale, not a one-size-fits-all default
+- **Cloud-fit filtering** — services that can't deploy in the customer's cloud (e.g., AWS-only FSxN for an Azure shop) are excluded from the #1 recommendation and footnoted with the reason
+- **Compliance & data protection** — maps regimes (GDPR residency, HIPAA BAA, PCI scope, SOX/ISO/SOC2) to concrete controls and surfaces the NetApp ransomware/DR story (SnapLock WORM, Autonomous Ransomware Protection, SnapMirror DR) as a first-class section
 - **Smart recommendation logic** — weighs cost, cloud affinity, performance, compliance, licensing, and strategy; prefers NetApp-managed file services when NFS/SMB is required, but adapts the pick to the customer's context
 - Generates a full executive-ready migration plan with phases, tools (Terraform, NetApp Cloud Volumes ONTAP, etc.), risks, timeline, rollback strategy, and Mermaid diagram
 - Includes an interactive **Streamlit web UI** for live demos

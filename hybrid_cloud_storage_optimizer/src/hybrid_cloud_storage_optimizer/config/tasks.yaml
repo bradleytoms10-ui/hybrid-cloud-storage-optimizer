@@ -83,6 +83,10 @@ generate_plan:
       ## Business Case  — the % TCO reduction vs the customer's current spend and whether it
         meets their target (from the tool's business_case); if no baseline was given, say a
         reduction can't be quantified yet and list it as an open question.
+      ## Compliance & Data Protection  — from the tool's compliance_guidance and
+        data_protection: residency/region, encryption + KMS, per-regime considerations
+        (BAA, PCI scope, WORM retention), and the NetApp ransomware/DR story (SnapLock,
+        Autonomous Ransomware Protection, tamper-proof snapshots, SnapMirror DR with RPO/RTO).
       ## Migration Plan  — numbered phases (Assess & Design → Provision → Seed/Replicate via
         SnapMirror → Validate → Cutover → Optimize), each one sentence.
       ## Tools  — Terraform, SnapMirror, NetApp Cloud Manager, etc.

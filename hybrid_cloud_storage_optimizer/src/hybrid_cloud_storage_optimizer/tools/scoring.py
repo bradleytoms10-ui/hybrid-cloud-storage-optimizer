@@ -185,6 +185,8 @@ def score_options(
     lo, hi = min(tcos.values()), max(tcos.values())
     span = hi - lo
 
+    named_cloud = ctx.cloud_provider.lower() in ("aws", "azure", "gcp")
+
     ranked: List[Dict[str, object]] = []
     for provider, cost in costs.items():
         profile = PROVIDER_PROFILES[provider]
@@ -192,6 +194,24 @@ def score_options(
         cost_score = 100.0 if span == 0 else 100.0 * (hi - tcos[provider]) / span
         fit_score, notes = _fit_score(provider, profile, ctx, needs_file_protocol)
         total = round(w_cost * cost_score + w_fit * fit_score, 1)
+
+        # Two hard constraints decide whether an option can be the #1 pick:
+        #   (1) protocol: object storage can't natively serve a required file protocol;
+        #   (2) cloud fit: a service native to a *different* named cloud isn't
+        #       deployable in the customer's footprint (FSxN is AWS-only, ANF Azure-only).
+        # Cloud-agnostic services (profile.cloud == "any", e.g. CVO) always fit.
+        protocol_ok = (not needs_file_protocol) or profile.serves_file_protocol
+        cloud_ok = (
+            (not named_cloud)
+            or profile.cloud == "any"
+            or profile.cloud == ctx.cloud_provider.lower()
+        )
+        ineligible_reason = ""
+        if not cloud_ok:
+            ineligible_reason = f"not available in the customer's {ctx.cloud_provider.upper()} footprint"
+        elif not protocol_ok:
+            ineligible_reason = "cannot natively serve the required file protocol"
+
         ranked.append(
             {
                 "provider": provider.replace("_", " "),
@@ -201,15 +221,14 @@ def score_options(
                 "cost_score": round(cost_score, 1),
                 "fit_score": round(fit_score, 1),
                 "total_score": total,
-                # Object storage cannot natively serve a required file protocol, so
-                # it is ineligible to be the primary recommendation (it may still be
-                # a complementary tier). Hard constraint, not a soft penalty.
-                "eligible": (not needs_file_protocol) or profile.serves_file_protocol,
+                "eligible": protocol_ok and cloud_ok,
+                "ineligible_reason": ineligible_reason,
                 "rationale": notes,
             }
         )
 
     # Eligible options first, then by blended score. Guarantees the top pick can
-    # actually serve the workload even when an ineligible option is cheaper.
+    # actually serve the workload AND deploy in the customer's cloud, even when an
+    # ineligible option scores higher on raw cost.
     ranked.sort(key=lambda r: (r["eligible"], r["total_score"]), reverse=True)
     return ranked
