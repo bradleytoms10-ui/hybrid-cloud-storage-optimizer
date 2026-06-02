@@ -1,8 +1,16 @@
 import os
 
 from crewai import LLM, Agent, Crew, Process, Task
-from crewai.project import CrewBase, after_kickoff, agent, crew, task
+from crewai.project import (
+    CrewBase,
+    after_kickoff,
+    agent,
+    before_kickoff,
+    crew,
+    task,
+)
 
+from . import runtime_context
 from .models import CustomerContext, StorageAnalysis
 from .observability import get_logger, init_langfuse, log_usage, tracing_enabled
 from .tools.storage_cost_calculator import StorageCostCalculatorTool
@@ -26,6 +34,15 @@ def _build_llm() -> LLM:
 @CrewBase
 class HybridCloudStorageOptimizer:
     """Hybrid Cloud Storage Optimizer - NetApp + Hybrid Cloud migration crew"""
+
+    @before_kickoff
+    def stash_context(self, inputs):
+        """Capture the customer context once so the cost tool can read it
+        directly — the LLM never has to serialize it into a tool argument."""
+        runtime_context.set_run_context_from_json(
+            (inputs or {}).get("customer_context_json", "")
+        )
+        return inputs
 
     agents_config = "config/agents.yaml"
     tasks_config = "config/tasks.yaml"

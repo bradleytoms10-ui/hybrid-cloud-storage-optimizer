@@ -4,12 +4,12 @@ Keeping the math in ``pricing.py`` makes it unit-testable without CrewAI; this
 module only handles the agent-facing schema, input validation, and error framing.
 """
 
-import json
 from typing import Any, Dict, Optional, Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from .. import runtime_context
 from . import pricing, scoring
 
 
@@ -51,18 +51,6 @@ class StorageCostCalculatorInput(BaseModel):
         description="The original workload description text. Used only as a "
         "fallback to detect file-protocol need when needs_file_protocol is omitted.",
     )
-    context_json: str = Field(
-        "",
-        description="Optional JSON string of customer context that re-ranks the "
-        'recommendation, e.g. {"cloud_provider":"azure","performance_tier":"high",'
-        '"budget_sensitivity":"performance","existing_netapp_ela":true,'
-        '"cloud_exit_optionality":false,"compliance":["fedramp"],'
-        '"provisioned_throughput_mbps":500,"on_prem_annual_usd":200000}. The last two '
-        "keys are optional: provisioned_throughput_mbps adds performance cost for "
-        "throughput-billed services, and on_prem_annual_usd drives the TCO-reduction "
-        "business case. Pass it through verbatim from the customer_context_json input; "
-        "do not invent values.",
-    )
 
 
 class StorageCostCalculatorTool(BaseTool):
@@ -72,7 +60,9 @@ class StorageCostCalculatorTool(BaseTool):
         "Azure Blob, Google Cloud, CVO, FSx for NetApp ONTAP, Azure NetApp Files). "
         "Sizes on effective (post-dedup) capacity, compounds growth month-by-month, "
         "and recommends NetApp-managed file services when NFS/SMB compatibility is "
-        "needed, otherwise the lowest-TCO option."
+        "needed, otherwise the lowest-TCO option. The customer context (cloud, "
+        "compliance, throughput, current spend) is applied automatically; you do not "
+        "pass it."
     )
     args_schema: Type[BaseModel] = StorageCostCalculatorInput
 
@@ -85,20 +75,13 @@ class StorageCostCalculatorTool(BaseTool):
         needs_file_protocol: Optional[bool] = None,
         enable_tiering: bool = True,
         workload_profile: str = "",
-        context_json: str = "",
     ) -> Dict[str, Any]:
-        context = None
-        throughput_mbps = 0.0
-        on_prem_annual = 0.0
-        if context_json:
-            try:
-                data = json.loads(context_json)
-                context = scoring.context_from_dict(data)
-                # Cost inputs ride the same JSON channel to avoid bloating tool args.
-                throughput_mbps = float(data.get("provisioned_throughput_mbps", 0) or 0)
-                on_prem_annual = float(data.get("on_prem_annual_usd", 0) or 0)
-            except (ValueError, TypeError):
-                context = None  # tolerate malformed JSON -> neutral ranking
+        # Customer context is injected at kickoff (not via the LLM), avoiding
+        # fragile nested-JSON tool arguments. Empty dict -> neutral ranking.
+        data = runtime_context.get_run_context()
+        context = scoring.context_from_dict(data) if data else None
+        throughput_mbps = float(data.get("provisioned_throughput_mbps", 0) or 0)
+        on_prem_annual = float(data.get("on_prem_annual_usd", 0) or 0)
         try:
             return pricing.build_report(
                 raw_or_used_tb=capacity_tb,

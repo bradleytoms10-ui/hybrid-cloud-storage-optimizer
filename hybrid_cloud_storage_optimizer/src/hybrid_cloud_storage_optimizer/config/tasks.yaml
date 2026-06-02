@@ -35,23 +35,20 @@ analyze_storage:
 estimate_costs:
   description: >
     Using the StorageAnalysis from the previous task and this workload profile: {workload_profile}
-    Call the storage_cost_calculator tool exactly once, with these arguments taken directly from
-    the StorageAnalysis:
+    Call the storage_cost_calculator tool exactly once, with ONLY these scalar arguments taken
+    directly from the StorageAnalysis (do not pass any customer-context or JSON argument — the
+    tool applies the customer context automatically):
       - capacity_tb = effective_capacity_tb
       - dedup_ratio = 1.0   (capacity is already post-dedup)
       - hot_percent = hot_data_percent
       - growth_rate_percent = growth_rate_percent
       - needs_file_protocol = needs_file_protocol   (pass the boolean exactly as given)
       - enable_tiering = {enable_tiering}   (pass this boolean exactly as given)
-      - context_json = the CustomerContext from the discovery task, serialized as a
-        compact JSON string (e.g. {"cloud_provider":"azure","performance_tier":"high",
-        "budget_sensitivity":"balanced","existing_netapp_ela":false,
-        "cloud_exit_optionality":false,"compliance":[]})
-    Do not invent, rename, or append any other fields. When enable_tiering is true the tool
-    applies NetApp FabricPool cold-tiering to managed-file options, which lowers their TCO.
-    The tool returns "ranked_options" (each with a score and rationale) that already weigh the
-    customer context (cloud footprint, performance, compliance, licensing, strategy) — your job
-    is to communicate them like a Solutions Engineer, NOT to default to one product.
+    Do not invent, rename, or append any other fields. The tool returns "ranked_options" (each
+    with a score and rationale), "excluded_options" (with reasons), a "business_case", and
+    "compliance_guidance"/"data_protection" — all already weighing the customer context (cloud
+    footprint, performance, compliance, licensing, strategy). Your job is to communicate them
+    like a Solutions Engineer, NOT to default to one product.
   expected_output: >
     A ranked trade-off table of all providers (provider, category, 3-yr TCO, score) followed by:
     (1) the recommended option with its rationale; (2) a brief "why not" for the runner-up;
