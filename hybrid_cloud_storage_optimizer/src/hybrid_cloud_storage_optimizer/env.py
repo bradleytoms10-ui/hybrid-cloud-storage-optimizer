@@ -49,8 +49,17 @@ def friendly_error(exc: Exception) -> str:
             "in .env (no quotes/extra spaces), confirm it is active in the Groq "
             "console, and fully restart the process so the new value is loaded."
         )
+    if "tokens per day" in text or "tpd" in text:
+        return (
+            "Daily token limit reached on the model provider's free tier. Wait for "
+            "the daily reset, switch MODEL to a lighter model for testing "
+            "(e.g. groq/llama-3.1-8b-instant), or upgrade your provider plan."
+        )
     if "rate limit" in text or "429" in text:
-        return "Rate limited by the model provider. Wait a moment and try again."
+        return (
+            "Rate limited by the model provider (requests/min). Wait ~30-60s and "
+            "re-run; consider setting max_rpm on the crew if it recurs."
+        )
     if "tool_use_failed" in text or "failed to call a function" in text:
         return (
             "The model produced a malformed tool call (a known Groq/Llama quirk). "
