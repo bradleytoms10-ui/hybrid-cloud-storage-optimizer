@@ -258,3 +258,125 @@ def test_explicit_file_protocol_flag_overrides_text_inference():
         ].category
         == pricing.OBJECT_STORAGE
     )
+
+
+# --------------------------------------------------------------------------- #
+# Timeline in the blended report
+# --------------------------------------------------------------------------- #
+def test_build_report_includes_migration_timeline():
+    report = pricing.build_report(raw_or_used_tb=350)
+    assert report["migration_timeline"]["source"] == "standard_template"
+
+    aligned = pricing.build_report(
+        raw_or_used_tb=350, milestones=["Pilot — Q4 2026", "Cutover — by March 2027"]
+    )
+    assert aligned["migration_timeline"]["source"] == "customer_milestones"
+    assert len(aligned["migration_timeline"]["phases"]) == 6
+
+
+# --------------------------------------------------------------------------- #
+# Segmented reports (per-workload placement)
+# --------------------------------------------------------------------------- #
+SEGMENTS = [
+    {"name": "File services", "workload_type": "file", "capacity_tb": 90},
+    {
+        "name": "Oracle SAN",
+        "workload_type": "block",
+        "capacity_tb": 45,
+        "hot_data_percent": 60,
+    },
+    {"name": "Archive", "workload_type": "object", "capacity_tb": 40},
+]
+
+
+def test_segmented_report_places_each_segment_on_its_merits():
+    report = pricing.build_segmented_report(
+        SEGMENTS, context=pricing.CustomerContext(cloud_provider="aws")
+    )
+    assert report["segmented"] is True
+    by_name = {s["name"]: s for s in report["segments"]}
+
+    # Block segment: object storage and ANF must be ineligible.
+    block_excluded = {e["provider"] for e in by_name["Oracle SAN"]["excluded_options"]}
+    assert "AWS S3" in block_excluded
+    assert "Azure NetApp Files Standard" in block_excluded
+    assert by_name["Oracle SAN"]["recommended_provider"] in (
+        "FSx for NetApp ONTAP",
+        "CVO",
+    )
+
+    # File segment: object storage ineligible, managed file recommended.
+    file_excluded = {
+        e["provider"] for e in by_name["File services"]["excluded_options"]
+    }
+    assert "AWS S3" in file_excluded
+    assert by_name["File services"]["recommended_provider"] == "FSx for NetApp ONTAP"
+
+    # Archive segment: scored with an archive posture -> object storage wins.
+    assert by_name["Archive"]["recommended_provider"] == "AWS S3"
+
+    # Capacity and totals roll up exactly.
+    assert report["effective_capacity_after_dedup_tb"] == 175.0
+    expected_total = round(sum(s["three_year_tco_usd"] for s in report["segments"]), 2)
+    assert report["three_year_tco_recommended_usd"] == expected_total
+    assert report["needs_file_protocol"] is True
+    assert report["needs_block_protocol"] is True
+
+
+def test_segmented_report_single_provider_alternative():
+    report = pricing.build_segmented_report(
+        SEGMENTS, context=pricing.CustomerContext(cloud_provider="aws")
+    )
+    single = report["combined"]["single_provider_alternative"]
+    assert single is not None
+    # Only a SAN-capable, AWS-deployable service can serve every segment.
+    assert single["provider_key"] in ("FSx_for_NetApp_ONTAP", "CVO")
+    assert single["three_year_tco_usd"] == pytest.approx(
+        report["combined"]["mixed_three_year_tco_usd"] + single["delta_vs_mixed_usd"],
+        abs=0.02,
+    )
+
+
+def test_segmented_report_throughput_apportioned_to_non_archive_segments():
+    base = pricing.build_segmented_report(SEGMENTS)
+    with_throughput = pricing.build_segmented_report(
+        SEGMENTS, provisioned_throughput_mbps=900
+    )
+    by_name_base = {s["name"]: s for s in base["segments"]}
+    by_name_tp = {s["name"]: s for s in with_throughput["segments"]}
+
+    def fsx_tco(report_by_name, name):
+        options = {
+            o["provider_key"]: o for o in report_by_name[name]["ranked_options"]
+        }
+        return options["FSx_for_NetApp_ONTAP"]["horizon_tco_usd"]
+
+    # Throughput-billed targets get pricier for file/block segments...
+    assert fsx_tco(by_name_tp, "File services") > fsx_tco(by_name_base, "File services")
+    assert fsx_tco(by_name_tp, "Oracle SAN") > fsx_tco(by_name_base, "Oracle SAN")
+    # ...but the archive segment consumes no provisioned throughput.
+    assert fsx_tco(by_name_tp, "Archive") == fsx_tco(by_name_base, "Archive")
+
+
+def test_segmented_report_business_case_uses_mixed_total():
+    report = pricing.build_segmented_report(SEGMENTS, on_prem_annual_usd=220_000)
+    bc = report["business_case"]
+    assert bc["baseline_provided"] is True
+    mixed = report["combined"]["mixed_three_year_tco_usd"]
+    expected_pct = (220_000 * 3 - mixed) / (220_000 * 3) * 100
+    assert bc["tco_reduction_percent"] == pytest.approx(expected_pct, abs=0.1)
+
+
+def test_segmented_report_falls_back_to_none_without_valid_segments():
+    assert pricing.build_segmented_report([]) is None
+    assert (
+        pricing.build_segmented_report([{"workload_type": "???", "capacity_tb": -1}])
+        is None
+    )
+
+
+def test_segmented_report_includes_timeline_and_assumptions():
+    report = pricing.build_segmented_report(SEGMENTS, milestones=["Pilot — Q4 2026"])
+    assert report["migration_timeline"]["source"] == "customer_milestones"
+    assert report["assumptions"]["segment_capacities_are_effective_tb"] is True
+    assert len(report["assumptions"]["segments"]) == 3

@@ -20,8 +20,10 @@ Built to showcase my 5+ years as a Solutions Architect at NetApp and 8 months as
 - **Cloud-fit filtering** — services that can't deploy in the customer's cloud (e.g., AWS-only FSxN for an Azure shop) are excluded from the #1 recommendation and footnoted with the reason
 - **Compliance & data protection** — maps regimes (GDPR residency, HIPAA BAA, PCI scope, SOX/ISO/SOC2) to concrete controls and surfaces the NetApp ransomware/DR story (SnapLock WORM, Autonomous Ransomware Protection, SnapMirror DR) as a first-class section
 - **Smart recommendation logic** — weighs cost, cloud affinity, performance, compliance, licensing, and strategy; prefers NetApp-managed file services when NFS/SMB is required, but adapts the pick to the customer's context
+- **Workload segmentation** — real estates aren't one blended pool: when the input describes distinct workload classes (an Oracle/SAP **SAN slice on iSCSI/FC LUNs**, an **NFS/SMB file-services** slice, a **cold archive** slice), each segment is priced and placed on its own merits — block workloads can only land on SAN-capable services (FSxN, CVO; never object storage or ANF), archive slices are scored with an archive posture — and the report rolls the picks into a mixed strategy with an explicit **single-provider consolidation alternative** and its cost delta
+- **Timeline alignment** — the migration plan consumes the **customer's stated milestones** ("Discovery — Q3 2026", "Pilot — Q4 2026", "Cutover — by March 2027") and maps the six migration phases onto those anchors (deadline semantics, interpolation for unanchored phases, conflict flagging), instead of emitting a generic 12-week template; falls back to the standard template only when no milestones are given
 - Generates a full executive-ready migration plan with phases, tools (Terraform, NetApp Cloud Volumes ONTAP, etc.), risks, timeline, rollback strategy, and Mermaid diagram
-- Includes an interactive **Streamlit web UI** for live demos
+- Includes an interactive **Streamlit web UI** with an enterprise-grade design: per-segment placement tables and TCO charts, a milestone-aligned phase schedule, and a transparent assumptions & methodology panel
 
 ### Project Overview
 Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate real-world solutions architecture skills. It takes a mock on-prem storage configuration (inspired by my NetApp experience) and automatically:
@@ -78,8 +80,9 @@ Hybrid Cloud Storage Optimizer is a multi-agent AI system I built to demonstrate
 The project uses a clean `src/` layout with `pyproject.toml` + `uv` for reproducible installs.
 
 #### Roadmap
-Live cloud-pricing API integration, cold-tier (FabricPool/Glacier) modeling, and a
-hosted Langfuse tracing dashboard.
+Live cloud-pricing API integration, a hosted Langfuse tracing dashboard, diagram
+vision (architecture-image ingestion once a vision-capable model is wired in), and
+RAG over the NetApp domain-knowledge corpus.
 
 
 ### How to Run

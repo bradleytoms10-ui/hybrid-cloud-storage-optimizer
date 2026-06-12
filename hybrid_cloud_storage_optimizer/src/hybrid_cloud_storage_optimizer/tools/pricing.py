@@ -25,15 +25,17 @@ approximate; treat outputs as planning estimates, not quotes.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+from dataclasses import dataclass, replace
+from typing import Dict, List, Optional, Sequence
 
 try:  # package import (production)
-    from . import compliance, scoring
+    from . import compliance, scoring, segmentation, timeline
     from .scoring import CustomerContext
 except ImportError:  # standalone import (isolated tests)
     import compliance
     import scoring
+    import segmentation
+    import timeline
     from scoring import CustomerContext
 
 GB_PER_TB = 1024
@@ -268,6 +270,7 @@ def build_report(
     provisioned_throughput_mbps: float = 0.0,
     on_prem_annual_usd: float = 0.0,
     target_reduction_percent: float = 30.0,
+    milestones: Optional[Sequence[str]] = None,
 ) -> Dict[str, object]:
     """End-to-end: derive effective capacity, compute TCO, score, and recommend.
 
@@ -280,7 +283,10 @@ def build_report(
     strategy — not just cost. ``provisioned_throughput_mbps`` adds performance cost
     for throughput-billed services. ``on_prem_annual_usd`` is the customer's current
     annual storage spend; when > 0 a business case (% TCO reduction vs the
-    ``target_reduction_percent`` goal) is computed. Cost figures remain authoritative.
+    ``target_reduction_percent`` goal) is computed. ``milestones`` are the
+    customer's stated timeline anchors (e.g. "Pilot — Q4 2026"); the returned
+    ``migration_timeline`` aligns the phase schedule to them, falling back to the
+    standard 12-week template when none parse. Cost figures remain authoritative.
     """
     eff = effective_capacity_tb(raw_or_used_tb, dedup_ratio)
     costs = calculate_tco(
@@ -342,6 +348,7 @@ def build_report(
         "business_case": business_case,
         "compliance_guidance": compliance_guidance,
         "data_protection": compliance.data_protection_guidance(),
+        "migration_timeline": timeline.build_schedule(milestones),
         "reason": rec["reason"],
         "note": (
             "NetApp-managed options preserve NFS/SMB and ONTAP features. With "
@@ -405,6 +412,253 @@ def _business_case(
             f"${baseline_horizon:,.0f} (${on_prem_annual_usd:,.0f}/yr) is a "
             f"{reduction_pct:.0f}% reduction, which {verb} the "
             f"{target_reduction_percent:.0f}% target."
+        ),
+    }
+
+
+def _segment_context(
+    ctx: CustomerContext, segment: "segmentation.Segment"
+) -> CustomerContext:
+    """Per-segment posture overrides: archive slices are scored as archive."""
+    if segment.workload_type == segmentation.OBJECT:
+        return replace(ctx, performance_tier="archive")
+    return ctx
+
+
+def _apportion_throughput(
+    segments: Sequence["segmentation.Segment"], total_mbps: float
+) -> Dict[str, float]:
+    """Split provisioned throughput across non-object segments by capacity share.
+
+    Archive/object slices don't consume provisioned throughput; charging the full
+    figure to every segment would double-count it. Proportional apportionment is
+    a documented planning assumption.
+    """
+    shares = {segment.name: 0.0 for segment in segments}
+    if total_mbps <= 0:
+        return shares
+    performance_segments = [
+        s for s in segments if s.workload_type != segmentation.OBJECT
+    ]
+    capacity = sum(s.capacity_tb for s in performance_segments)
+    if capacity <= 0:
+        return shares
+    for segment in performance_segments:
+        shares[segment.name] = total_mbps * segment.capacity_tb / capacity
+    return shares
+
+
+def _combined_strategy(
+    segment_reports: List[Dict[str, object]],
+) -> Dict[str, object]:
+    """Roll per-segment picks into a mixed strategy + single-provider comparison.
+
+    The mixed strategy sums each segment's recommended target. The comparison
+    finds the cheapest SINGLE provider eligible for every segment, so the report
+    can quantify what operational consolidation would cost (or save) — a
+    trade-off real SEs are always asked about.
+    """
+    mixed_total = round(sum(s["three_year_tco_usd"] for s in segment_reports), 2)
+
+    by_provider: Dict[str, List[str]] = {}
+    for segment in segment_reports:
+        by_provider.setdefault(segment["recommended_provider"], []).append(
+            segment["name"]
+        )
+    if len(by_provider) == 1:
+        strategy_label = next(iter(by_provider))
+    else:
+        strategy_label = "Mixed: " + " + ".join(by_provider)
+
+    # Providers eligible in EVERY segment, totaled across segments.
+    eligibility: Dict[str, bool] = {}
+    totals: Dict[str, float] = {}
+    for segment in segment_reports:
+        for option in segment["ranked_options"]:
+            key = option["provider_key"]
+            eligibility[key] = eligibility.get(key, True) and option["eligible"]
+            totals[key] = totals.get(key, 0.0) + option["horizon_tco_usd"]
+    universal = {k: totals[k] for k, ok in eligibility.items() if ok}
+
+    single = None
+    if universal:
+        best_key = min(universal, key=universal.get)
+        delta = round(universal[best_key] - mixed_total, 2)
+        single = {
+            "provider": best_key.replace("_", " "),
+            "provider_key": best_key,
+            "three_year_tco_usd": round(universal[best_key], 2),
+            "delta_vs_mixed_usd": delta,
+            "note": (
+                f"Cheapest single provider able to serve every segment. "
+                f"Consolidating the whole estate there would "
+                f"{'cost an extra' if delta >= 0 else 'save'} "
+                f"${abs(delta):,.0f} over the horizon versus the per-segment mix, "
+                "traded against operating one platform instead of several."
+            ),
+        }
+
+    return {
+        "strategy_label": strategy_label,
+        "mixed_three_year_tco_usd": mixed_total,
+        "placements": [
+            {
+                "provider": provider,
+                "segments": names,
+            }
+            for provider, names in by_provider.items()
+        ],
+        "single_provider_alternative": single,
+    }
+
+
+def build_segmented_report(
+    raw_segments: Sequence[Dict[str, object]],
+    *,
+    default_hot_percent: float = 20.0,
+    default_growth_percent: float = 15.0,
+    egress_turnover_per_month: float = 1.0,
+    horizon_years: int = 3,
+    enable_tiering: bool = True,
+    context: Optional[CustomerContext] = None,
+    provisioned_throughput_mbps: float = 0.0,
+    on_prem_annual_usd: float = 0.0,
+    target_reduction_percent: float = 30.0,
+    milestones: Optional[Sequence[str]] = None,
+) -> Optional[Dict[str, object]]:
+    """Per-segment TCO + placement: price each workload slice on its own merits.
+
+    A blended pool hides that SAN/block, NFS/SMB file, and archive slices have
+    different protocol constraints and access patterns. This prices each segment
+    separately (its own hot %, growth, eligibility), recommends a target per
+    segment, and rolls the picks into a combined strategy with an explicit
+    single-provider consolidation comparison.
+
+    Segment capacities are EFFECTIVE (post-dedup) TB. Returns ``None`` when no
+    valid segments survive normalization (caller falls back to the blended
+    ``build_report``).
+    """
+    segments = segmentation.normalize_segments(
+        raw_segments,
+        default_hot_percent=default_hot_percent,
+        default_growth_percent=default_growth_percent,
+    )
+    if not segments:
+        return None
+
+    ctx = context or CustomerContext()
+    throughput_shares = _apportion_throughput(segments, provisioned_throughput_mbps)
+
+    segment_reports: List[Dict[str, object]] = []
+    for segment in segments:
+        costs = calculate_tco(
+            effective_tb=segment.capacity_tb,
+            hot_percent=segment.hot_percent,
+            annual_growth_percent=segment.growth_rate_percent,
+            egress_turnover_per_month=egress_turnover_per_month,
+            horizon_years=horizon_years,
+            enable_tiering=enable_tiering,
+            provisioned_throughput_mbps=throughput_shares[segment.name],
+        )
+        needs_file = segment.workload_type == segmentation.FILE
+        needs_block = segment.workload_type == segmentation.BLOCK
+        ranked = scoring.score_options(
+            costs,
+            needs_file_protocol=needs_file,
+            needs_block_protocol=needs_block,
+            context=_segment_context(ctx, segment),
+        )
+        top = ranked[0]
+        segment_reports.append(
+            {
+                "name": segment.name,
+                "workload_type": segment.workload_type,
+                "capacity_tb": segment.capacity_tb,
+                "hot_percent": segment.hot_percent,
+                "growth_rate_percent": segment.growth_rate_percent,
+                "recommended_provider": top["provider"],
+                "recommended_provider_key": top["provider_key"],
+                "three_year_tco_usd": costs[top["provider_key"]]["horizon_tco_usd"],
+                "no_eligible_target": not top["eligible"],
+                "reason": _explain(top, needs_file),
+                "ranked_options": ranked,
+                "excluded_options": [
+                    {"provider": o["provider"], "reason": o["ineligible_reason"]}
+                    for o in ranked
+                    if not o["eligible"]
+                ],
+            }
+        )
+
+    combined = _combined_strategy(segment_reports)
+    mixed_total = combined["mixed_three_year_tco_usd"]
+    business_case = _business_case(
+        mixed_total, horizon_years, on_prem_annual_usd, target_reduction_percent
+    )
+    compliance_guidance = compliance.build_compliance_guidance(
+        list(ctx.compliance), ctx.cloud_provider
+    )
+
+    placements = "; ".join(
+        f"{s['name']} ({s['workload_type']}) → {s['recommended_provider']} "
+        f"(${s['three_year_tco_usd']:,.0f})"
+        for s in segment_reports
+    )
+    reason = (
+        f"Per-workload placement instead of one blended pool: {placements}. "
+        f"Mixed-estate 3-yr TCO ${mixed_total:,.0f}."
+    )
+    single = combined["single_provider_alternative"]
+    if single:
+        reason += (
+            f" Consolidating everything on {single['provider']} would run "
+            f"${single['three_year_tco_usd']:,.0f} "
+            f"({'+' if single['delta_vs_mixed_usd'] >= 0 else '-'}"
+            f"${abs(single['delta_vs_mixed_usd']):,.0f} vs the mix)."
+        )
+
+    return {
+        "segmented": True,
+        "segments": segment_reports,
+        "combined": combined,
+        "effective_capacity_after_dedup_tb": segmentation.total_capacity_tb(segments),
+        "horizon_years": horizon_years,
+        "needs_file_protocol": any(
+            s.workload_type == segmentation.FILE for s in segments
+        ),
+        "needs_block_protocol": any(
+            s.workload_type == segmentation.BLOCK for s in segments
+        ),
+        "assumptions": {
+            "pricing_as_of": PRICING_AS_OF,
+            "region": PRICING_REGION,
+            "segment_capacities_are_effective_tb": True,
+            "segments": [segmentation.describe(s) for s in segments],
+            "egress_turnover_per_month": egress_turnover_per_month,
+            "provisioned_throughput_mbps": provisioned_throughput_mbps,
+            "throughput_apportionment": (
+                "provisioned MBps split across non-archive segments by capacity "
+                "share (archive/object slices consume none)"
+            ),
+            "fabricpool_tiering_enabled": enable_tiering,
+            "fabricpool_capacity_tier_rate_per_gb": FABRICPOOL_CAPACITY_TIER_RATE,
+            "excluded_from_model": EXCLUDED_FROM_MODEL,
+        },
+        "recommended_provider": combined["strategy_label"],
+        "three_year_tco_recommended_usd": mixed_total,
+        "business_case": business_case,
+        "compliance_guidance": compliance_guidance,
+        "data_protection": compliance.data_protection_guidance(),
+        "migration_timeline": timeline.build_schedule(milestones),
+        "reason": reason,
+        "note": (
+            "Each segment is priced and placed on its own merits (protocol "
+            "eligibility, access pattern, growth). Block (iSCSI/FC) segments can "
+            "only land on SAN-capable services (FSx for NetApp ONTAP, CVO); "
+            "archive segments are scored with an archive posture. The combined "
+            "view includes a single-provider consolidation alternative so the "
+            "cost of operational simplicity is explicit. Cost figures are "
+            "authoritative; ranking reflects the supplied customer context."
         ),
     }
 

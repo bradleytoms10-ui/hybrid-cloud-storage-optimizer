@@ -44,6 +44,26 @@ class HybridCloudStorageOptimizer:
         )
         return inputs
 
+    # Mid-run handoffs follow the same reliability pattern as the customer
+    # context: typed task outputs that downstream tools need (workload segments,
+    # timeline milestones) are stashed in the run context the moment the task
+    # completes, so the cost tool reads them directly and the LLM keeps passing
+    # only simple scalar tool arguments (avoids Groq/Llama tool_use_failed).
+    @staticmethod
+    def _stash_discovery_output(output) -> None:
+        pyd = getattr(output, "pydantic", None)
+        if pyd is not None:
+            runtime_context.merge_milestones(getattr(pyd, "milestones", None))
+
+    @staticmethod
+    def _stash_storage_analysis(output) -> None:
+        pyd = getattr(output, "pydantic", None)
+        segments = getattr(pyd, "segments", None) if pyd is not None else None
+        if segments:
+            runtime_context.merge_run_context(
+                {"segments": [segment.model_dump() for segment in segments]}
+            )
+
     agents_config = "config/agents.yaml"
     tasks_config = "config/tasks.yaml"
 
@@ -90,6 +110,7 @@ class HybridCloudStorageOptimizer:
             config=self.tasks_config["discover_context"],
             agent=self.requirements_analyst(),
             output_pydantic=CustomerContext,
+            callback=self._stash_discovery_output,
         )
 
     @task
@@ -98,6 +119,7 @@ class HybridCloudStorageOptimizer:
             config=self.tasks_config["analyze_storage"],
             agent=self.storage_analyst(),
             output_pydantic=StorageAnalysis,
+            callback=self._stash_storage_analysis,
         )
 
     @task

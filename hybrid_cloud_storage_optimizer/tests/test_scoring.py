@@ -130,3 +130,53 @@ def test_every_option_has_rationale():
     )
     assert all(isinstance(o["rationale"], list) for o in ranked)
     assert all(0 <= o["total_score"] <= 100 for o in ranked)
+
+
+# --------------------------------------------------------------------------- #
+# Block (SAN/iSCSI) protocol eligibility
+# --------------------------------------------------------------------------- #
+def test_block_protocol_excludes_object_and_anf():
+    ranked = scoring.score_options(
+        COSTS,
+        needs_file_protocol=False,
+        needs_block_protocol=True,
+        context=CustomerContext(),
+    )
+    by_key = {o["provider_key"]: o for o in ranked}
+    # Only SAN-capable services may be eligible.
+    for key in ("AWS_S3", "Azure_Blob", "Google_Cloud", "Azure_NetApp_Files_Standard"):
+        assert by_key[key]["eligible"] is False
+        assert "block" in by_key[key]["ineligible_reason"]
+    for key in ("FSx_for_NetApp_ONTAP", "CVO"):
+        assert by_key[key]["eligible"] is True
+    # And the #1 pick must serve block.
+    assert scoring.PROVIDER_PROFILES[ranked[0]["provider_key"]].serves_block_protocol
+
+
+def test_block_protocol_with_azure_footprint_falls_to_cvo():
+    # ANF can't serve iSCSI and FSxN is AWS-only, so an Azure SAN workload
+    # should land on cloud-agnostic CVO.
+    ranked = scoring.score_options(
+        COSTS,
+        needs_file_protocol=False,
+        needs_block_protocol=True,
+        context=CustomerContext(cloud_provider="azure"),
+    )
+    assert ranked[0]["provider_key"] == "CVO"
+    assert ranked[0]["eligible"] is True
+
+
+def test_no_block_requirement_keeps_prior_behaviour():
+    # Default needs_block_protocol=False must not change existing rankings.
+    baseline = scoring.score_options(
+        COSTS, needs_file_protocol=True, context=CustomerContext(cloud_provider="aws")
+    )
+    explicit = scoring.score_options(
+        COSTS,
+        needs_file_protocol=True,
+        needs_block_protocol=False,
+        context=CustomerContext(cloud_provider="aws"),
+    )
+    assert [o["provider_key"] for o in baseline] == [
+        o["provider_key"] for o in explicit
+    ]

@@ -25,21 +25,30 @@ NETAPP_MANAGED_FILE = "NetApp Managed File"
 
 @dataclass(frozen=True)
 class ProviderProfile:
-    """Static, non-cost attributes used for fit scoring."""
+    """Static, non-cost attributes used for fit scoring.
+
+    ``serves_block_protocol`` is native SAN support (iSCSI/FC LUNs): true for
+    FSx for NetApp ONTAP (iSCSI/NVMe-over-TCP) and Cloud Volumes ONTAP (iSCSI);
+    false for Azure NetApp Files (NFS/SMB only — Azure's block answer is a
+    different product) and for all object storage.
+    """
 
     cloud: str  # "aws" | "azure" | "gcp" | "any"
     serves_file_protocol: bool  # native NFS/SMB
     portability: str  # "high" | "medium" | "low"
     netapp_managed: bool
+    serves_block_protocol: bool = False  # native iSCSI/FC (SAN)
 
 
 PROVIDER_PROFILES: Dict[str, ProviderProfile] = {
-    "AWS_S3": ProviderProfile("aws", False, "low", False),
-    "Azure_Blob": ProviderProfile("azure", False, "low", False),
-    "Google_Cloud": ProviderProfile("gcp", False, "low", False),
-    "CVO": ProviderProfile("any", True, "high", True),
-    "FSx_for_NetApp_ONTAP": ProviderProfile("aws", True, "medium", True),
-    "Azure_NetApp_Files_Standard": ProviderProfile("azure", True, "medium", True),
+    "AWS_S3": ProviderProfile("aws", False, "low", False, False),
+    "Azure_Blob": ProviderProfile("azure", False, "low", False, False),
+    "Google_Cloud": ProviderProfile("gcp", False, "low", False, False),
+    "CVO": ProviderProfile("any", True, "high", True, True),
+    "FSx_for_NetApp_ONTAP": ProviderProfile("aws", True, "medium", True, True),
+    "Azure_NetApp_Files_Standard": ProviderProfile(
+        "azure", True, "medium", True, False
+    ),
 }
 
 # Weight presets: (cost_weight, fit_weight).
@@ -98,6 +107,7 @@ def _fit_score(
     profile: ProviderProfile,
     ctx: CustomerContext,
     needs_file_protocol: bool,
+    needs_block_protocol: bool = False,
 ) -> tuple[float, List[str]]:
     """Return (clamped 0-100 fit score, list of human-readable rationale notes)."""
     score = 50.0
@@ -111,6 +121,14 @@ def _fit_score(
         else:
             score -= 40
             notes.append("cannot natively serve the required file protocol")
+
+    if needs_block_protocol:
+        if profile.serves_block_protocol:
+            score += 10
+            notes.append("serves iSCSI/block (SAN) natively")
+        else:
+            score -= 40
+            notes.append("cannot natively serve block (iSCSI/FC) workloads")
 
     # Cloud affinity with the customer's existing footprint.
     cloud = ctx.cloud_provider.lower()
@@ -174,6 +192,7 @@ def score_options(
     costs: Dict[str, Dict[str, float]],
     *,
     needs_file_protocol: bool,
+    needs_block_protocol: bool = False,
     context: CustomerContext | None = None,
 ) -> List[Dict[str, object]]:
     """Rank providers by blended cost + fit score; return richest-first list."""
@@ -192,15 +211,20 @@ def score_options(
         profile = PROVIDER_PROFILES[provider]
         # Cheapest = 100; most expensive = 0. Degenerate span -> neutral 50.
         cost_score = 100.0 if span == 0 else 100.0 * (hi - tcos[provider]) / span
-        fit_score, notes = _fit_score(provider, profile, ctx, needs_file_protocol)
+        fit_score, notes = _fit_score(
+            provider, profile, ctx, needs_file_protocol, needs_block_protocol
+        )
         total = round(w_cost * cost_score + w_fit * fit_score, 1)
 
-        # Two hard constraints decide whether an option can be the #1 pick:
-        #   (1) protocol: object storage can't natively serve a required file protocol;
-        #   (2) cloud fit: a service native to a *different* named cloud isn't
-        #       deployable in the customer's footprint (FSxN is AWS-only, ANF Azure-only).
+        # Three hard constraints decide whether an option can be the #1 pick:
+        #   (1) file protocol: object storage can't natively serve required NFS/SMB;
+        #   (2) block protocol: only SAN-capable services (FSxN, CVO) can serve
+        #       iSCSI/FC LUN workloads — object storage and ANF cannot;
+        #   (3) cloud fit: a service native to a *different* named cloud isn't
+        #       deployable in that footprint (FSxN is AWS-only, ANF Azure-only).
         # Cloud-agnostic services (profile.cloud == "any", e.g. CVO) always fit.
         protocol_ok = (not needs_file_protocol) or profile.serves_file_protocol
+        block_ok = (not needs_block_protocol) or profile.serves_block_protocol
         cloud_ok = (
             (not named_cloud)
             or profile.cloud == "any"
@@ -211,6 +235,8 @@ def score_options(
             ineligible_reason = f"not available in the customer's {ctx.cloud_provider.upper()} footprint"
         elif not protocol_ok:
             ineligible_reason = "cannot natively serve the required file protocol"
+        elif not block_ok:
+            ineligible_reason = "cannot natively serve block (iSCSI/FC) workloads"
 
         ranked.append(
             {
@@ -221,7 +247,7 @@ def score_options(
                 "cost_score": round(cost_score, 1),
                 "fit_score": round(fit_score, 1),
                 "total_score": total,
-                "eligible": protocol_ok and cloud_ok,
+                "eligible": protocol_ok and block_ok and cloud_ok,
                 "ineligible_reason": ineligible_reason,
                 "rationale": notes,
             }

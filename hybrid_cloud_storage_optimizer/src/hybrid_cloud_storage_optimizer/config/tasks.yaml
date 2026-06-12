@@ -13,10 +13,15 @@ discover_context:
       - Leave a field at its default when there is no supporting evidence; do not guess.
       - Copy provisioned_throughput_mbps and on_prem_annual_usd through from the hints
         verbatim (0 if absent) — do not infer or alter these two numbers.
+      - Extract timeline milestones the customer actually states (in the hints, notes,
+        or artifacts), each formatted "Label — period": e.g. "Discovery — Q3 2026",
+        "Pilot — Q4 2026", "Cutover — by March 2027", "Full migration — next year".
+        Include explicit hint milestones verbatim. Empty list if none stated — never
+        invent dates.
   expected_output: >
     A CustomerContext object with cloud_provider, performance_tier, budget_sensitivity,
     existing_netapp_ela, cloud_exit_optionality, compliance, provisioned_throughput_mbps,
-    and on_prem_annual_usd.
+    on_prem_annual_usd, and milestones.
   agent: requirements_analyst
 
 analyze_storage:
@@ -26,10 +31,20 @@ analyze_storage:
     Derive the numeric fields carefully: used_capacity_tb is raw capacity multiplied by utilization;
     effective_capacity_tb is used_capacity_tb divided by the dedup_ratio. Set needs_file_protocol to
     true if the workload mentions NFS, SMB, CIFS, ONTAP, or file shares.
+    Workload segmentation: when the configuration/workload text clearly describes more
+    than one workload class, split the estate into segments instead of one blended pool —
+    SAN/iSCSI/FC/LUN/Oracle/SAP/VMware-datastore evidence => workload_type "block";
+    NFS/SMB/CIFS/home-directory shares => "file"; archive/backup/cold/long-term-retention
+    => "object". For each segment give a short name and its EFFECTIVE (post-dedup)
+    capacity_tb, applying a workload-appropriate dedup expectation (databases often
+    ~1.5:1; general file ~2:1; pre-compressed data less) and keeping the sum consistent
+    with effective_capacity_tb. Set per-segment hot_data_percent/growth_rate_percent only
+    when the text states them; otherwise leave them null. Leave segments EMPTY for a
+    uniform estate — never invent a split the input does not support.
   expected_output: >
     A StorageAnalysis object with: summary, raw_capacity_tb, used_capacity_tb, dedup_ratio,
     effective_capacity_tb, hot_data_percent, growth_rate_percent, needs_file_protocol,
-    inefficiencies (list), and recommendations (list).
+    inefficiencies (list), recommendations (list), and segments (list, possibly empty).
   agent: storage_analyst
 
 estimate_costs:
@@ -44,14 +59,22 @@ estimate_costs:
       - growth_rate_percent = growth_rate_percent
       - needs_file_protocol = needs_file_protocol   (pass the boolean exactly as given)
       - enable_tiering = {enable_tiering}   (pass this boolean exactly as given)
-    Do not invent, rename, or append any other fields. The tool returns "ranked_options" (each
-    with a score and rationale), "excluded_options" (with reasons), a "business_case", and
-    "compliance_guidance"/"data_protection" — all already weighing the customer context (cloud
-    footprint, performance, compliance, licensing, strategy). Your job is to communicate them
-    like a Solutions Engineer, NOT to default to one product.
+    Do not invent, rename, or append any other fields. The tool automatically applies the
+    customer context AND any workload segments from the storage analysis. If the result has
+    "segmented": true, it prices each segment separately: "segments" (each with its own
+    ranked_options, recommendation, and exclusions) plus "combined" (the mixed strategy total
+    and a single_provider_alternative quantifying what consolidation would cost). Otherwise it
+    returns the blended "ranked_options"/"excluded_options". Both shapes include a
+    "business_case", "compliance_guidance"/"data_protection", and "migration_timeline". Your
+    job is to communicate the results like a Solutions Engineer, NOT to default to one product.
   expected_output: >
-    A ranked trade-off table of all providers (provider, category, 3-yr TCO, score) followed by:
-    (1) the recommended option with its rationale; (2) a brief "why not" for the runner-up;
+    If the tool result is segmented: a per-segment placement table (segment, workload type,
+    effective TB, recommended target, 3-yr TCO) with a one-line rationale per segment and the
+    key exclusions (e.g. "object storage cannot serve iSCSI LUNs"), then the combined mixed
+    strategy with total 3-yr TCO and the single-provider consolidation alternative with its
+    cost delta and the operational trade-off. If blended: a ranked trade-off table of all
+    providers (provider, category, 3-yr TCO, score). In BOTH cases follow with:
+    (1) the recommendation and its rationale; (2) a brief "why not" for the runner-up;
     (3) the business_case from the tool — state the % TCO reduction vs the customer's current
     spend and whether it meets their target, or, if no baseline was provided, say so and ask for
     it; (4) explicit stated assumptions and a confidence level; (5) if the customer context is
@@ -66,6 +89,16 @@ generate_plan:
     Highlight the recommended provider and the reasoning, and carry through the cost step's
     stated assumptions, confidence level, "why not the runner-up", and any discovery questions —
     write like a Solutions Engineer tailoring to this customer, not a one-size-fits-all default.
+    TIMELINE: the cost step's migration_timeline is authoritative. If its source is
+    "customer_milestones", align every phase to the given windows, name the customer
+    milestone each anchored phase honors, and surface any "conflicts" as risks to confirm —
+    do NOT substitute a generic week count. Only when the source is "standard_template" use
+    the standard 12-week framing and note dates should be confirmed in discovery.
+    SEGMENTS: when the cost step is segmented, plan per-segment migration mechanics — block
+    (iSCSI/FC LUNs): SnapMirror LUN replication, host initiator/multipath remediation, and a
+    per-application cutover wave; file (NFS/SMB): SnapMirror with share/export cutover and
+    client repointing; archive/object: bulk object copy with lifecycle policies. Sequence
+    waves sensibly (lowest-risk first) within the customer's timeline.
     The Mermaid diagram MUST use valid syntax: start with "flowchart LR", use edges of the
     form A[Label] -->|edge text| B[Label]. Do NOT use the invalid form "-->|text|>" (no extra
     ">" after the closing pipe). Keep node labels short and free of special characters.
@@ -74,8 +107,12 @@ generate_plan:
       ## Executive Summary  — 2-4 sentences: the recommendation, its 3-yr TCO, and the single
         most important reason, framed for a decision-maker.
       ## Current State  — effective capacity, protocol need, key inefficiencies/triggers.
-      ## Options & Costs  — the full ranked trade-off table (provider, category, FabricPool,
-        3-yr TCO, score), then the recommendation, the "why not the runner-up", and stated
+      ## Workload Segments  — ONLY when the cost step is segmented: the per-segment placement
+        table (segment, type, effective TB, target, 3-yr TCO), the combined mixed-strategy
+        total, and the single-provider consolidation alternative with its delta. Omit the
+        section entirely for a blended estate.
+      ## Options & Costs  — the ranked trade-off table (blended) or per-segment rankings
+        summary (segmented), then the recommendation, the "why not the runner-up", and stated
         assumptions + confidence level.
       ## Business Case  — the % TCO reduction vs the customer's current spend and whether it
         meets their target (from the tool's business_case); if no baseline was given, say a
@@ -85,10 +122,15 @@ generate_plan:
         (BAA, PCI scope, WORM retention), and the NetApp ransomware/DR story (SnapLock,
         Autonomous Ransomware Protection, tamper-proof snapshots, SnapMirror DR with RPO/RTO).
       ## Migration Plan  — numbered phases (Assess & Design → Provision → Seed/Replicate via
-        SnapMirror → Validate → Cutover → Optimize), each one sentence.
+        SnapMirror → Validate → Cutover → Optimize), each one sentence; for segmented estates
+        note the per-segment mechanics (LUN vs share vs object copy) and wave order.
       ## Tools  — Terraform, SnapMirror, NetApp Cloud Manager, etc.
-      ## Risks & Mitigations  — 3-4 concrete pairs.
-      ## Timeline  — phased weeks.
+      ## Risks & Mitigations  — 3-4 concrete pairs; include any timeline conflicts flagged by
+        the migration_timeline.
+      ## Timeline  — reproduce the migration_timeline phase windows exactly (phase, window,
+        anchoring milestone); when source is customer_milestones, state plainly that the plan
+        is aligned to the customer's stated dates and call out the cutover target; otherwise
+        use the standard 12-week template and say dates need confirmation.
       ## Rollback  — read-only source until validation passes.
       ## Open Questions  — the discovery questions to confirm with the customer.
       ## Architecture  — a valid Mermaid `flowchart LR` (edges as A[Label] -->|text| B[Label]).

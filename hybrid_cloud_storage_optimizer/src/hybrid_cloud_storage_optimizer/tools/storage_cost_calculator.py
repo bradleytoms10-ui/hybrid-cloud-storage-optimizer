@@ -61,8 +61,9 @@ class StorageCostCalculatorTool(BaseTool):
         "Sizes on effective (post-dedup) capacity, compounds growth month-by-month, "
         "and recommends NetApp-managed file services when NFS/SMB compatibility is "
         "needed, otherwise the lowest-TCO option. The customer context (cloud, "
-        "compliance, throughput, current spend) is applied automatically; you do not "
-        "pass it."
+        "compliance, throughput, current spend), any workload segments from the "
+        "storage analysis (SAN/file/archive priced per-segment), and customer "
+        "timeline milestones are all applied automatically; you do not pass them."
     )
     args_schema: Type[BaseModel] = StorageCostCalculatorInput
 
@@ -76,13 +77,30 @@ class StorageCostCalculatorTool(BaseTool):
         enable_tiering: bool = True,
         workload_profile: str = "",
     ) -> Dict[str, Any]:
-        # Customer context is injected at kickoff (not via the LLM), avoiding
-        # fragile nested-JSON tool arguments. Empty dict -> neutral ranking.
+        # Customer context is injected at kickoff and typed task outputs
+        # (segments, milestones) are merged in by task callbacks — never via the
+        # LLM — avoiding fragile nested-JSON tool arguments (tool_use_failed).
         data = runtime_context.get_run_context()
         context = scoring.context_from_dict(data) if data else None
         throughput_mbps = float(data.get("provisioned_throughput_mbps", 0) or 0)
         on_prem_annual = float(data.get("on_prem_annual_usd", 0) or 0)
+        milestones = data.get("milestones") or []
+        raw_segments = data.get("segments") or []
         try:
+            if raw_segments:
+                segmented = pricing.build_segmented_report(
+                    raw_segments,
+                    default_hot_percent=hot_percent,
+                    default_growth_percent=growth_rate_percent,
+                    enable_tiering=enable_tiering,
+                    context=context,
+                    provisioned_throughput_mbps=throughput_mbps,
+                    on_prem_annual_usd=on_prem_annual,
+                    milestones=milestones,
+                )
+                if segmented is not None:
+                    return segmented
+                # No valid segments survived normalization -> blended fallback.
             return pricing.build_report(
                 raw_or_used_tb=capacity_tb,
                 dedup_ratio=dedup_ratio,
@@ -94,6 +112,7 @@ class StorageCostCalculatorTool(BaseTool):
                 context=context,
                 provisioned_throughput_mbps=throughput_mbps,
                 on_prem_annual_usd=on_prem_annual,
+                milestones=milestones,
             )
         except ValueError as exc:
             return {"error": f"Invalid input to storage_cost_calculator: {exc}"}

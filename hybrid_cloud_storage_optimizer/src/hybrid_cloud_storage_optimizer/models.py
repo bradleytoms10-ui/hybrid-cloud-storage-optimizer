@@ -6,9 +6,47 @@ estimator receives structured, type-checked fields (notably the effective capaci
 and protocol need that drive the cost calculation).
 """
 
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
+
+
+class WorkloadSegment(BaseModel):
+    """One distinct workload slice of the estate (SAN/file/archive).
+
+    Real environments are rarely one blended pool: an Oracle/SAP SAN slice
+    (iSCSI/FC LUNs), an NFS/SMB file-services slice, and a cold archive slice
+    have different protocol constraints and access patterns, so each is priced
+    and placed separately by the cost engine.
+    """
+
+    name: str = Field(
+        ...,
+        description="Short descriptive name, e.g. 'Oracle SAN' or 'File services'.",
+    )
+    workload_type: str = Field(
+        ...,
+        description="'block' for SAN/iSCSI/FC/LUN workloads (databases, VMware), "
+        "'file' for NFS/SMB/CIFS shares, 'object' for archive/backup/cold data.",
+    )
+    capacity_tb: float = Field(
+        ...,
+        description="EFFECTIVE (post-dedup/compression) capacity of this segment "
+        "in TB. Apply a workload-appropriate dedup expectation (databases often "
+        "~1.5:1, general file ~2:1). Segment capacities should sum to "
+        "effective_capacity_tb.",
+    )
+    hot_data_percent: Optional[float] = Field(
+        None,
+        description="Hot/frequently-accessed percent for THIS segment, only if "
+        "the input states it; otherwise leave null and the engine applies "
+        "defaults (archive segments default low).",
+    )
+    growth_rate_percent: Optional[float] = Field(
+        None,
+        description="Annual growth percent for THIS segment, only if stated; "
+        "otherwise leave null.",
+    )
 
 
 class StorageAnalysis(BaseModel):
@@ -45,6 +83,14 @@ class StorageAnalysis(BaseModel):
     )
     recommendations: List[str] = Field(
         default_factory=list, description="Optimization or migration recommendations."
+    )
+    segments: List[WorkloadSegment] = Field(
+        default_factory=list,
+        description="Distinct workload segments, ONLY when the input clearly "
+        "describes more than one workload class (e.g. SAN/iSCSI/FC/LUN/Oracle/"
+        "SAP/VMware => block; NFS/SMB/CIFS/home directories => file; archive/"
+        "backup/cold/retention => object). Leave empty for a uniform estate — "
+        "never invent a split the input does not support.",
     )
 
 
@@ -91,4 +137,13 @@ class CustomerContext(BaseModel):
         description="Customer's current on-prem annual storage spend (USD). Copy "
         "through from the hints verbatim; 0 if unknown. Drives the % TCO-reduction "
         "business case.",
+    )
+    milestones: List[str] = Field(
+        default_factory=list,
+        description="Customer-stated migration milestones, each formatted "
+        "'Label — period', e.g. 'Discovery — Q3 2026', 'Pilot — Q4 2026', "
+        "'Cutover — by March 2027'. Include every explicit hint verbatim and add "
+        "milestones clearly stated in the notes/artifacts (phrases like 'pilot "
+        "by Q4' or 'complete the migration in H1 2027'). Empty if none stated — "
+        "do not invent dates.",
     )
