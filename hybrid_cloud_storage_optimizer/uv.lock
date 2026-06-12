@@ -972,8 +972,10 @@ name = "hybrid-cloud-storage-optimizer"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "altair" },
     { name = "crewai" },
     { name = "litellm" },
+    { name = "pandas" },
     { name = "pypdf" },
     { name = "streamlit" },
 ]
@@ -993,9 +995,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "altair", specifier = ">=5.0" },
     { name = "crewai", specifier = "==1.11.0" },
     { name = "langfuse", marker = "extra == 'tracing'", specifier = ">=2.0" },
     { name = "litellm", specifier = ">=1.82.5" },
+    { name = "pandas", specifier = ">=2.0" },
     { name = "pypdf", specifier = ">=4.0" },
     { name = "streamlit", specifier = ">=1.55.0" },
 ]

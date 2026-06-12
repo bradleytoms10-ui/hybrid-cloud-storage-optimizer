@@ -8,6 +8,8 @@ from pathlib import Path
 # which does not pip-install the local project). src/ is two levels up.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import altair as alt  # noqa: E402
+import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
 from hybrid_cloud_storage_optimizer.crew import (  # noqa: E402
@@ -20,9 +22,13 @@ from hybrid_cloud_storage_optimizer.env import (  # noqa: E402
     validate_environment,
 )
 from hybrid_cloud_storage_optimizer.formatting import clean_output  # noqa: E402
-from hybrid_cloud_storage_optimizer.tools import artifacts  # noqa: E402
+from hybrid_cloud_storage_optimizer.tools import (
+    artifacts,
+    pricing,
+    scoring,
+)  # noqa: E402
 
-# ── Page config ──────────────────────────────────────────────────────────────
+# ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Hybrid Cloud Storage Optimizer",
     page_icon="☁️",
@@ -30,118 +36,135 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
+# ── Custom CSS — vibrant gradient SaaS ──────────────────────────────────────────
 st.markdown(
     """
 <style>
-/* ── Brand header ── */
-.brand-header {
-    background: linear-gradient(135deg, #0f2842 0%, #1a4a7a 60%, #0078d4 100%);
-    border-radius: 12px;
-    padding: 2rem 2.5rem 1.5rem;
-    margin-bottom: 1.5rem;
-    color: white;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+html, body, [class*="css"], .stMarkdown, .stTextArea, .stSelectbox, .stTextInput {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
 }
-.brand-header h1 { font-size: 2rem; font-weight: 700; margin: 0 0 0.25rem; color: white; }
-.brand-header p  { font-size: 1rem; opacity: 0.85; margin: 0; color: white; }
-.brand-badge {
+.block-container { padding-top: 2rem; max-width: 1180px; }
+
+/* ── Hero ── */
+.hero {
+    background: linear-gradient(120deg, #4f46e5 0%, #7c3aed 45%, #2563eb 100%);
+    border-radius: 22px;
+    padding: 2.6rem 2.8rem 2.2rem;
+    margin-bottom: 1.8rem;
+    color: white;
+    box-shadow: 0 18px 45px -18px rgba(79, 70, 229, 0.65);
+    position: relative;
+    overflow: hidden;
+}
+.hero::after {
+    content: "";
+    position: absolute; top: -40%; right: -10%;
+    width: 380px; height: 380px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%);
+}
+.hero h1 { font-size: 2.4rem; font-weight: 800; margin: 0 0 0.4rem; color: white; letter-spacing: -0.02em; }
+.hero p  { font-size: 1.05rem; opacity: 0.92; margin: 0; color: white; font-weight: 400; }
+.hero .badges { margin-top: 1rem; }
+.hero .pill {
     display: inline-block;
-    background: rgba(255,255,255,0.15);
-    border-radius: 20px;
-    padding: 2px 12px;
-    font-size: 0.75rem;
-    margin-right: 6px;
-    margin-top: 10px;
-    color: white;
+    background: rgba(255,255,255,0.16);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 30px;
+    padding: 4px 14px; font-size: 0.78rem; font-weight: 500;
+    margin-right: 8px; margin-top: 8px; color: white;
 }
 
-/* ── Section cards ── */
-.section-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1rem;
-}
+/* ── Section labels ── */
 .section-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #64748b;
-    margin-bottom: 0.6rem;
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #7c3aed; margin: 0.5rem 0 0.7rem;
 }
 
-/* ── Metric callout ── */
-.metric-row {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
-}
+/* ── Metric cards ── */
+.metric-row { display: flex; gap: 1rem; margin: 0.5rem 0 1.5rem; flex-wrap: wrap; }
 .metric-card {
-    flex: 1;
-    min-width: 160px;
+    flex: 1; min-width: 175px;
     background: white;
-    border: 1px solid #e2e8f0;
-    border-left: 4px solid #0078d4;
-    border-radius: 8px;
-    padding: 0.9rem 1.1rem;
+    border: 1px solid #ede9fe;
+    border-radius: 16px;
+    padding: 1.1rem 1.3rem;
+    box-shadow: 0 10px 30px -20px rgba(79,70,229,0.5);
+    position: relative; overflow: hidden;
 }
-.metric-card.green  { border-left-color: #16a34a; }
-.metric-card.orange { border-left-color: #ea580c; }
-.metric-card.purple { border-left-color: #7c3aed; }
-.metric-card .mc-label { font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-.metric-card .mc-value { font-size: 1.5rem; font-weight: 700; color: #0f172a; line-height: 1.2; margin-top: 2px; }
-.metric-card .mc-sub   { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+.metric-card::before {
+    content: ""; position: absolute; top: 0; left: 0; height: 100%; width: 5px;
+    background: linear-gradient(180deg, #6d28d9, #2563eb);
+}
+.metric-card.green::before  { background: linear-gradient(180deg, #16a34a, #22c55e); }
+.metric-card.orange::before { background: linear-gradient(180deg, #ea580c, #f59e0b); }
+.metric-card.blue::before   { background: linear-gradient(180deg, #2563eb, #06b6d4); }
+.metric-card .mc-label { font-size: 0.7rem; color: #8b8a9b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.metric-card .mc-value { font-size: 1.7rem; font-weight: 800; color: #1e1b2e; line-height: 1.15; margin-top: 4px; }
+.metric-card .mc-sub   { font-size: 0.75rem; color: #8b8a9b; margin-top: 3px; }
 
 /* ── Agent progress ── */
-.agent-step { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; }
-.agent-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.section-card {
+    background: #faf9ff; border: 1px solid #ede9fe; border-radius: 16px;
+    padding: 1.3rem 1.6rem; margin-bottom: 1rem;
+}
+.agent-step { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0; }
+.agent-dot  { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
 .agent-dot.done    { background: #16a34a; }
-.agent-dot.running { background: #0078d4; animation: pulse 1.2s infinite; }
-.agent-dot.pending { background: #cbd5e1; }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
-.agent-name { font-size: 0.85rem; color: #334155; }
+.agent-dot.running { background: #7c3aed; animation: pulse 1.2s infinite; }
+.agent-dot.pending { background: #d8d4f0; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: 0.4; transform: scale(1.25);} }
+.agent-name { font-size: 0.88rem; color: #4b4860; }
 .agent-name.done    { color: #15803d; }
-.agent-name.running { color: #0078d4; font-weight: 600; }
-.agent-name.pending { color: #94a3b8; }
+.agent-name.running { color: #6d28d9; font-weight: 700; }
+.agent-name.pending { color: #a8a4c0; }
 
-/* ── Result tabs ── */
-div[data-testid="stTabs"] button { font-weight: 600; font-size: 0.85rem; }
+/* ── Primary button ── */
+div[data-testid="stButton"] > button[kind="primary"] {
+    background: linear-gradient(120deg, #6d28d9, #4f46e5 60%, #2563eb);
+    border: none; border-radius: 12px; font-weight: 700; font-size: 1rem;
+    padding: 0.7rem 1rem; box-shadow: 0 12px 28px -12px rgba(79,70,229,0.7);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+div[data-testid="stButton"] > button[kind="primary"]:hover {
+    transform: translateY(-2px); box-shadow: 0 16px 34px -12px rgba(79,70,229,0.8);
+}
+
+/* ── Tabs ── */
+div[data-testid="stTabs"] button { font-weight: 600; font-size: 0.9rem; }
+div[data-testid="stTabs"] button[aria-selected="true"] { color: #6d28d9; }
+div[data-testid="stTabs"] [data-baseweb="tab-highlight"] { background: #6d28d9; }
 
 /* ── Download button ── */
 div[data-testid="stDownloadButton"] button {
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    color: #334155;
-    font-size: 0.82rem;
+    background: #f5f3ff; border: 1px solid #ddd6fe; color: #5b21b6;
+    border-radius: 10px; font-weight: 600; font-size: 0.84rem;
 }
 
 /* ── Footer ── */
 .app-footer {
-    text-align: center;
-    font-size: 0.72rem;
-    color: #94a3b8;
-    margin-top: 2rem;
-    padding-top: 1rem;
-    border-top: 1px solid #e2e8f0;
+    text-align: center; font-size: 0.74rem; color: #a8a4c0;
+    margin-top: 2.2rem; padding-top: 1.1rem; border-top: 1px solid #ede9fe;
 }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# ── Header ────────────────────────────────────────────────────────────────────
+# ── Hero ─────────────────────────────────────────────────────────────────────
 st.markdown(
     """
-<div class="brand-header">
+<div class="hero">
   <h1>☁️ Hybrid Cloud Storage Optimizer</h1>
-  <p>AI-powered migration advisor · NetApp ONTAP → Cloud · 2026 TCO engine</p>
-  <span class="brand-badge">CrewAI multi-agent</span>
-  <span class="brand-badge">6 cloud providers</span>
-  <span class="brand-badge">Deterministic pricing</span>
-  <span class="brand-badge">Compliance-aware</span>
+  <p>AI migration advisor for NetApp ONTAP → Cloud · deterministic 2026 TCO across 6 providers</p>
+  <div class="badges">
+    <span class="pill">⚡ CrewAI multi-agent</span>
+    <span class="pill">📊 Deterministic pricing</span>
+    <span class="pill">🛡️ Compliance-aware</span>
+    <span class="pill">🧊 FabricPool tiering</span>
+  </div>
 </div>
 """,
     unsafe_allow_html=True,
@@ -158,7 +181,6 @@ with col1:
             "heavy NFS workloads, dedup ratio 2:1"
         ),
         height=110,
-        label_visibility="visible",
     )
 with col2:
     workload_profile = st.text_area(
@@ -244,7 +266,7 @@ with st.expander("🧭 Customer Discovery  (optional — shapes the recommendati
 
 run_clicked = st.button("🚀 Run Analysis", type="primary", use_container_width=True)
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Pipeline metadata ───────────────────────────────────────────────────────────
 _AGENT_STEPS = [
     (
         "requirements_analyst",
@@ -260,46 +282,124 @@ _AGENT_STEPS = [
     ("migration_architect", "Migration Architect", "Drafts phased migration plan"),
 ]
 
-_PROVIDER_LABELS = {
-    "fsx": "FSx for ONTAP",
-    "fsxn": "FSx for ONTAP",
-    "cvo": "NetApp CVO",
-    "anf": "Azure NetApp Files",
-    "azure netapp": "Azure NetApp Files",
-    "aws s3": "AWS S3",
-    "azure blob": "Azure Blob",
-    "google": "Google Cloud Storage",
-    "gcs": "Google Cloud Storage",
-}
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def _structured_report(result, form_ctx, tiering):
+    """Re-run the deterministic engine with the analyst's structured output so the
+    metric cards and chart use exact numbers (not regex-scraped prose). Returns the
+    build_report dict, or None if the structured analysis can't be recovered."""
+    try:
+        analysis = None
+        for task_out in getattr(result, "tasks_output", []) or []:
+            pyd = getattr(task_out, "pydantic", None)
+            if pyd is not None and hasattr(pyd, "effective_capacity_tb"):
+                analysis = pyd
+                break
+        if analysis is None:
+            return None
+        return pricing.build_report(
+            raw_or_used_tb=float(analysis.effective_capacity_tb),
+            dedup_ratio=1.0,
+            hot_percent=float(analysis.hot_data_percent),
+            annual_growth_percent=float(analysis.growth_rate_percent),
+            file_protocol_required=bool(analysis.needs_file_protocol),
+            enable_tiering=tiering,
+            context=scoring.context_from_dict(form_ctx),
+            provisioned_throughput_mbps=float(
+                form_ctx.get("provisioned_throughput_mbps", 0) or 0
+            ),
+            on_prem_annual_usd=float(form_ctx.get("on_prem_annual_usd", 0) or 0),
+        )
+    except Exception:  # noqa: BLE001 - visualization is best-effort, never fatal
+        return None
+
+
+def _metric_cards_html(report: dict) -> str:
+    rec = report["recommended_provider"]
+    tco = report["three_year_tco_recommended_usd"]
+    eff = report["effective_capacity_after_dedup_tb"]
+    bc = report.get("business_case", {})
+    cards = [
+        f'<div class="metric-card"><div class="mc-label">Recommended</div>'
+        f'<div class="mc-value" style="font-size:1.2rem">{rec}</div>'
+        f'<div class="mc-sub">best cost-and-fit score</div></div>',
+        f'<div class="metric-card green"><div class="mc-label">3-Year TCO</div>'
+        f'<div class="mc-value">${tco:,.0f}</div>'
+        f'<div class="mc-sub">recommended solution</div></div>',
+    ]
+    if bc.get("baseline_provided"):
+        pct = bc["tco_reduction_percent"]
+        meets = "meets target ✓" if bc["meets_target"] else "below target"
+        cards.append(
+            f'<div class="metric-card orange"><div class="mc-label">TCO Reduction</div>'
+            f'<div class="mc-value">{pct:.0f}%</div>'
+            f'<div class="mc-sub">vs current spend · {meets}</div></div>'
+        )
+    cards.append(
+        f'<div class="metric-card blue"><div class="mc-label">Effective Capacity</div>'
+        f'<div class="mc-value">{eff:,.0f} TB</div>'
+        f'<div class="mc-sub">after dedup/compression</div></div>'
+    )
+    return f'<div class="metric-row">{"".join(cards)}</div>'
+
+
+def _tco_chart(report: dict):
+    """Horizontal bar of 3-year TCO by provider, recommended highlighted."""
+    rec = report["recommended_provider"]
+    rows = []
+    for opt in report["ranked_options"]:
+        label = opt["provider"]
+        if not opt.get("eligible", True):
+            label += "  ⚠︎"  # ineligible (cloud/protocol) — shown but not picked
+        rows.append(
+            {
+                "Provider": label,
+                "TCO": opt["horizon_tco_usd"],
+                "Pick": "Recommended" if opt["provider"] == rec else "Alternative",
+            }
+        )
+    df = pd.DataFrame(rows)
+    return (
+        alt.Chart(df)
+        .mark_bar(cornerRadiusEnd=7, height=22)
+        .encode(
+            x=alt.X("TCO:Q", title="3-Year TCO (USD)", axis=alt.Axis(format="$,.0f")),
+            y=alt.Y(
+                "Provider:N",
+                sort=alt.EncodingSortField("TCO", order="ascending"),
+                title=None,
+            ),
+            color=alt.Color(
+                "Pick:N",
+                scale=alt.Scale(
+                    domain=["Recommended", "Alternative"],
+                    range=["#7c3aed", "#cbd5e1"],
+                ),
+                legend=alt.Legend(title=None, orient="top"),
+            ),
+            tooltip=[
+                "Provider",
+                alt.Tooltip("TCO:Q", format="$,.0f", title="3-Year TCO"),
+            ],
+        )
+        .properties(height=300)
+    )
 
 
 def _extract_metrics(text: str) -> dict:
-    """Pull headline numbers from the LLM output for the metric cards."""
+    """Regex fallback for metric cards when structured data is unavailable."""
     metrics = {}
-
-    # Recommended solution — look for bold/heading near "recommend"
     for pat in [
         r"(?:recommended?|top recommendation)[:\s*]*\*{0,2}([^\n*]+?)\*{0,2}\n",
-        r"#+ ?(?:recommended?|top)[^\n]*\n\*{0,2}([^\n*]+?)\*{0,2}",
         r"\*{1,2}([^\n*]{5,60})\*{1,2}[^\n]*(?:is|as) (?:the )?(?:recommended?|top|optimal)",
     ]:
         m = re.search(pat, text, re.IGNORECASE)
         if m:
             metrics["recommendation"] = m.group(1).strip().rstrip(".")
             break
-
-    # 3-year TCO of recommended solution
-    for pat in [
-        r"(?:3.year|three.year)[^\n]*?TCO[^\n]*?\$([\d,]+(?:\.\d+)?[KMk]?)",
-        r"\$([\d,]+(?:\.\d+)?[KMk]?)[^\n]*(?:3.year|three.year)[^\n]*TCO",
-        r"TCO[^\n]*?\$([\d,]+(?:\.\d+)?[KMk]?)",
-    ]:
-        m = re.search(pat, text, re.IGNORECASE)
-        if m:
-            metrics["tco"] = "$" + m.group(1).strip()
-            break
-
-    # Savings % vs on-prem
+    m = re.search(r"TCO[^\n]*?\$([\d,]+(?:\.\d+)?[KMk]?)", text, re.IGNORECASE)
+    if m:
+        metrics["tco"] = "$" + m.group(1).strip()
     m = re.search(
         r"(\d{1,3})\s*%\s*(?:TCO\s*)?(?:reduction|savings|cheaper|lower)",
         text,
@@ -307,28 +407,13 @@ def _extract_metrics(text: str) -> dict:
     )
     if m:
         metrics["savings_pct"] = m.group(1) + "%"
-
-    # Payback / break-even months
-    m = re.search(r"(\d+)\s*month[s]?\s*(?:payback|break.?even)", text, re.IGNORECASE)
-    if m:
-        metrics["payback"] = m.group(1) + " mo"
-
     return metrics
 
 
-def _split_sections(text: str) -> dict[str, str]:
-    """
-    Split markdown output into named sections for the tabbed display.
-    Returns keys: summary, cost, plan, full.
-    """
-    sections: dict[str, list[str]] = {
-        "summary": [],
-        "cost": [],
-        "plan": [],
-        "other": [],
-    }
+def _split_sections(text: str) -> dict:
+    """Split markdown output into named sections for the tabbed display."""
+    sections = {"summary": [], "cost": [], "plan": [], "other": []}
     current = "other"
-
     cost_kw = re.compile(
         r"(?:cost|tco|pricing|price|financial|budget|spend|savings?|roi)", re.I
     )
@@ -339,7 +424,6 @@ def _split_sections(text: str) -> dict[str, str]:
     summary_kw = re.compile(
         r"(?:executive summary|overview|summary|recommendation|conclusion)", re.I
     )
-
     for line in text.splitlines():
         heading = re.match(r"^#{1,3}\s+(.+)", line)
         if heading:
@@ -357,30 +441,27 @@ def _split_sections(text: str) -> dict[str, str]:
     def _join(key: str) -> str:
         return "\n".join(sections[key]).strip()
 
-    summary_text = _join("summary") or _join("other")
-    cost_text = _join("cost")
-    plan_text = _join("plan")
-
-    return {"summary": summary_text, "cost": cost_text, "plan": plan_text, "full": text}
+    return {
+        "summary": _join("summary") or _join("other"),
+        "cost": _join("cost"),
+        "plan": _join("plan"),
+        "full": text,
+    }
 
 
 def _agent_progress_html(active_index: int) -> str:
     rows = []
     for i, (_, name, desc) in enumerate(_AGENT_STEPS):
         if i < active_index:
-            state = "done"
-            icon = "✓"
+            state, icon = "done", "✓"
         elif i == active_index:
-            state = "running"
-            icon = "▶"
+            state, icon = "running", "▶"
         else:
-            state = "pending"
-            icon = "○"
+            state, icon = "pending", "○"
         rows.append(
-            f'<div class="agent-step">'
-            f'<div class="agent-dot {state}"></div>'
+            f'<div class="agent-step"><div class="agent-dot {state}"></div>'
             f'<span class="agent-name {state}">{icon} {name}</span>'
-            f'<span style="font-size:0.75rem;color:#94a3b8;margin-left:4px">— {desc}</span>'
+            f'<span style="font-size:0.76rem;color:#a8a4c0;margin-left:4px">— {desc}</span>'
             f"</div>"
         )
     return "\n".join(rows)
@@ -420,7 +501,6 @@ if run_clicked:
         st.warning(str(exc))
         st.stop()
 
-    # ── Agent progress display ────────────────────────────────────────────────
     progress_placeholder = st.empty()
 
     def _show_progress(step: int) -> None:
@@ -433,22 +513,14 @@ if run_clicked:
         )
 
     _show_progress(0)
-
-    # CrewAI runs synchronously; we update the progress indicator between tasks
-    # by hooking the task callbacks on the crew object.
     result_container = [None]
     error_container = [None]
-
-    # Patch: inject a step-advance callback via CrewAI task callbacks
-    task_counter = [0]
 
     try:
         crew_obj = HybridCloudStorageOptimizer().crew()
 
-        # Attach a callback to each task that advances the progress display
+        # Advance the progress display as each task completes.
         for i, task in enumerate(crew_obj.tasks):
-            step_index = i  # capture
-
             original_cb = getattr(task, "callback", None)
 
             def _make_cb(idx, orig):
@@ -459,7 +531,7 @@ if run_clicked:
 
                 return _cb
 
-            task.callback = _make_cb(step_index, original_cb)
+            task.callback = _make_cb(i, original_cb)
 
         result = crew_obj.kickoff(inputs=inputs)
         result_container[0] = result
@@ -473,84 +545,72 @@ if run_clicked:
         st.stop()
 
     raw_text = clean_output(str(result_container[0]))
+    report = _structured_report(result_container[0], context, enable_tiering)
 
-    # ── Metric callout cards ──────────────────────────────────────────────────
-    metrics = _extract_metrics(raw_text)
+    # ── Metric cards (structured if available, regex fallback otherwise) ────────
+    if report:
+        st.markdown(_metric_cards_html(report), unsafe_allow_html=True)
+    else:
+        metrics = _extract_metrics(raw_text)
+        cards = ""
+        if metrics.get("recommendation"):
+            cards += (
+                f'<div class="metric-card"><div class="mc-label">Recommended</div>'
+                f'<div class="mc-value" style="font-size:1.2rem">{metrics["recommendation"]}</div></div>'
+            )
+        if metrics.get("tco"):
+            cards += (
+                f'<div class="metric-card green"><div class="mc-label">3-Year TCO</div>'
+                f'<div class="mc-value">{metrics["tco"]}</div></div>'
+            )
+        if metrics.get("savings_pct"):
+            cards += (
+                f'<div class="metric-card orange"><div class="mc-label">TCO Reduction</div>'
+                f'<div class="mc-value">{metrics["savings_pct"]}</div></div>'
+            )
+        if cards:
+            st.markdown(
+                f'<div class="metric-row">{cards}</div>', unsafe_allow_html=True
+            )
 
-    cards_html = ""
-    if metrics.get("recommendation"):
-        cards_html += (
-            f'<div class="metric-card">'
-            f'<div class="mc-label">Top Recommendation</div>'
-            f'<div class="mc-value" style="font-size:1.1rem">{metrics["recommendation"]}</div>'
-            f"</div>"
-        )
-    if metrics.get("tco"):
-        cards_html += (
-            f'<div class="metric-card green">'
-            f'<div class="mc-label">3-Year TCO</div>'
-            f'<div class="mc-value">{metrics["tco"]}</div>'
-            f'<div class="mc-sub">recommended solution</div>'
-            f"</div>"
-        )
-    if metrics.get("savings_pct"):
-        cards_html += (
-            f'<div class="metric-card orange">'
-            f'<div class="mc-label">TCO Reduction</div>'
-            f'<div class="mc-value">{metrics["savings_pct"]}</div>'
-            f'<div class="mc-sub">vs current on-prem spend</div>'
-            f"</div>"
-        )
-    if metrics.get("payback"):
-        cards_html += (
-            f'<div class="metric-card purple">'
-            f'<div class="mc-label">Payback Period</div>'
-            f'<div class="mc-value">{metrics["payback"]}</div>'
-            f"</div>"
-        )
-
-    if cards_html:
-        st.markdown(
-            f'<div class="metric-row">{cards_html}</div>',
-            unsafe_allow_html=True,
-        )
-
-    # ── Success banner ────────────────────────────────────────────────────────
     st.success("✅ Analysis complete — review the sections below.")
 
-    # ── Tabbed results ────────────────────────────────────────────────────────
+    # ── Tabbed results ──────────────────────────────────────────────────────────
     sections = _split_sections(raw_text)
-
-    tab_labels = [
-        "📋 Summary & Recommendation",
-        "💰 Cost Analysis",
-        "🗺️ Migration Plan",
-        "📄 Full Report",
-    ]
-    tabs = st.tabs(tab_labels)
+    tabs = st.tabs(
+        [
+            "📋 Summary & Recommendation",
+            "💰 Cost Analysis",
+            "🗺️ Migration Plan",
+            "📄 Full Report",
+        ]
+    )
 
     with tabs[0]:
-        if sections["summary"]:
-            st.markdown(sections["summary"])
-        else:
-            st.markdown(raw_text)
+        st.markdown(sections["summary"] or raw_text)
 
     with tabs[1]:
+        if report:
+            st.markdown(
+                '<div class="section-label">3-Year TCO by provider</div>',
+                unsafe_allow_html=True,
+            )
+            st.altair_chart(_tco_chart(report), use_container_width=True)
+            excluded = report.get("excluded_options", [])
+            if excluded:
+                note = "; ".join(f"{e['provider']} ({e['reason']})" for e in excluded)
+                st.caption(f"Excluded from the recommendation: {note}.")
         if sections["cost"]:
             st.markdown(sections["cost"])
-        else:
+        elif not report:
             st.info("Cost breakdown is embedded in the Full Report tab.")
 
     with tabs[2]:
-        if sections["plan"]:
-            st.markdown(sections["plan"])
-        else:
-            st.info("Migration plan is embedded in the Full Report tab.")
+        st.markdown(sections["plan"] or "Migration plan is in the Full Report tab.")
 
     with tabs[3]:
         st.markdown(raw_text)
 
-    # ── Download ──────────────────────────────────────────────────────────────
     st.download_button(
         label="⬇️ Download full report (.md)",
         data=raw_text,
