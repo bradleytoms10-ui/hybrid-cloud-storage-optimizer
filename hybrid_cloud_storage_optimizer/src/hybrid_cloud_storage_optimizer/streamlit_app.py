@@ -289,9 +289,7 @@ with st.expander("Customer discovery (optional — shapes the recommendation)"):
     milestones_raw = st.text_area(
         "Migration milestones (one per line)",
         height=80,
-        placeholder=(
-            "Discovery — Q3 2026\nPilot — Q4 2026\nCutover — by March 2027"
-        ),
+        placeholder="Discovery — Q3 2026\nPilot — Q4 2026\nCutover — by March 2027",
         help=(
             "The customer's stated dates. The plan's phase schedule is aligned "
             "to these instead of a generic 12-week template. Milestones found in "
@@ -555,9 +553,7 @@ def _render_assumptions(report: dict) -> None:
             "compounds growth month-by-month over the horizon.",
         ]
         if "segments" in assumptions:
-            lines.append(
-                "- **Segments:** " + "; ".join(assumptions["segments"]) + "."
-            )
+            lines.append("- **Segments:** " + "; ".join(assumptions["segments"]) + ".")
             lines.append(
                 f"- **Throughput:** {assumptions['throughput_apportionment']}."
             )
@@ -811,9 +807,7 @@ if run_clicked:
                     f'(${seg["three_year_tco_usd"]:,.0f})</div>',
                     unsafe_allow_html=True,
                 )
-                st.altair_chart(
-                    _tco_chart(seg, height=210), use_container_width=True
-                )
+                st.altair_chart(_tco_chart(seg, height=210), use_container_width=True)
                 if seg["excluded_options"]:
                     note = "; ".join(
                         f"{e['provider']} ({e['reason']})"
@@ -857,9 +851,7 @@ if run_clicked:
                 st.warning(f"Timeline conflict: {conflict}")
             unparsed = schedule.get("unparsed_milestones", [])
             if unparsed:
-                st.caption(
-                    "Could not interpret as dates: " + "; ".join(unparsed) + "."
-                )
+                st.caption("Could not interpret as dates: " + "; ".join(unparsed) + ".")
         st.markdown(sections["plan"] or "Migration plan is in the Full Report tab.")
 
     with tabs[3]:

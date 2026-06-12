@@ -303,9 +303,7 @@ def _standard_template() -> Dict[str, object]:
             "is shown. Confirm target dates in discovery and re-run to align the "
             "plan to the customer's calendar."
         ),
-        "schedule_lines": [
-            f"{p['phase']}: {p['window']}" for p in phases
-        ],
+        "schedule_lines": [f"{p['phase']}: {p['window']}" for p in phases],
     }
 
 
@@ -334,9 +332,7 @@ def build_schedule(
     unaligned: List[dict] = []
     for milestone in parsed:
         if milestone.phase is None:
-            unaligned.append(
-                {"label": milestone.label, "window": milestone.display}
-            )
+            unaligned.append({"label": milestone.label, "window": milestone.display})
             continue
         phase_index = PHASES.index(milestone.phase)
         anchors[phase_index] = _merge_anchor(anchors.get(phase_index), milestone)

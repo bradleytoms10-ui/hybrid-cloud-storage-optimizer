@@ -76,10 +76,7 @@ def test_schedule_aligns_to_customer_milestones():
     assert phases["Cutover"]["window"] == "Dec 2027"
     # Interpolated phases fill the gap in order, without overlap regressions.
     assert phases["Seed & Replicate"]["start_month"] >= 7
-    assert (
-        phases["Validate"]["start_month"]
-        >= phases["Seed & Replicate"]["end_month"]
-    )
+    assert phases["Validate"]["start_month"] >= phases["Seed & Replicate"]["end_month"]
     assert schedule["conflicts"] == []
     assert len(schedule["schedule_lines"]) == len(timeline.PHASES)
 
@@ -109,9 +106,8 @@ def test_schedule_keeps_unaligned_milestones_visible():
         ["Pilot — Q4 2026", "Board review — Q1 2027"], today=TODAY
     )
     assert schedule["source"] == "customer_milestones"
-    assert {"label": "Board review", "window": "Q1 2027"} in schedule[
-        "unaligned_milestones"
-    ]
+    unaligned = schedule["unaligned_milestones"]
+    assert {"label": "Board review", "window": "Q1 2027"} in unaligned
 
 
 def test_single_deadline_milestone_schedules_preceding_phases():

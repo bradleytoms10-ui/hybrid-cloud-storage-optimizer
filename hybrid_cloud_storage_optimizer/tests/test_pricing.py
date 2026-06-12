@@ -346,9 +346,7 @@ def test_segmented_report_throughput_apportioned_to_non_archive_segments():
     by_name_tp = {s["name"]: s for s in with_throughput["segments"]}
 
     def fsx_tco(report_by_name, name):
-        options = {
-            o["provider_key"]: o for o in report_by_name[name]["ranked_options"]
-        }
+        options = {o["provider_key"]: o for o in report_by_name[name]["ranked_options"]}
         return options["FSx_for_NetApp_ONTAP"]["horizon_tco_usd"]
 
     # Throughput-billed targets get pricier for file/block segments...
@@ -369,10 +367,8 @@ def test_segmented_report_business_case_uses_mixed_total():
 
 def test_segmented_report_falls_back_to_none_without_valid_segments():
     assert pricing.build_segmented_report([]) is None
-    assert (
-        pricing.build_segmented_report([{"workload_type": "???", "capacity_tb": -1}])
-        is None
-    )
+    invalid = [{"workload_type": "???", "capacity_tb": -1}]
+    assert pricing.build_segmented_report(invalid) is None
 
 
 def test_segmented_report_includes_timeline_and_assumptions():
